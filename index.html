@@ -23,51 +23,57 @@
 
   <button id="activate">Activer le jouet</button>
 
-  <script>
+ <script>
   const HA_URL = "https://haintelligentclassroom.adaptatech.org";
   const WEBHOOK_ID = "toy_relay";
 
-  // UI helpers
-  const statusBox = document.createElement('div');
-  statusBox.style.position = 'fixed';
-  statusBox.style.bottom = '14px';
-  statusBox.style.left = '14px';
-  statusBox.style.padding = '8px 12px';
-  statusBox.style.borderRadius = '10px';
-  statusBox.style.background = 'rgba(0,0,0,.6)';
-  statusBox.style.font = '14px/1.3 system-ui, Arial';
-  statusBox.textContent = 'ready';
-  document.body.appendChild(statusBox);
-
-  function setStatus(t) { statusBox.textContent = t; console.log(t); }
+  // Tiny HUD
+  const hud = document.createElement('pre');
+  hud.style.position = 'fixed';
+  hud.style.bottom = '12px';
+  hud.style.left   = '12px';
+  hud.style.maxWidth = '80vw';
+  hud.style.maxHeight = '40vh';
+  hud.style.overflow = 'auto';
+  hud.style.padding = '10px 12px';
+  hud.style.background = 'rgba(0,0,0,.6)';
+  hud.style.borderRadius = '10px';
+  hud.style.font = '12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace';
+  hud.style.color = '#fff';
+  hud.textContent = 'ready';
+  document.body.appendChild(hud);
+  const log = (...args) => { console.log(...args); hud.textContent = args.map(x => String(x)).join(' '); };
 
   async function triggerToy() {
-    setStatus('click → sending…');
     try {
-      const url = `${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`; // cache-bust
-      const res = await fetch(url, { method: "POST", mode: "cors" });
-      setStatus(`response: ${res.status}`);
-      if (!res.ok) alert("Erreur: " + res.status);
+      const url = `${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`;
+      log('sending →', url);
+      const res = await fetch(url, {
+        method: "POST",         // no headers = no CORS preflight
+        redirect: "follow",     // show us if CF is redirecting/challenging
+        cache: "no-store",
+        credentials: "omit"
+      });
+      const text = await res.text();
+      log(`status ${res.status} @ ${res.url}\n${text.slice(0,200)}`);
+      if (!res.ok) alert(`Erreur: ${res.status}`);
     } catch (e) {
-      setStatus('network error (see console)');
-      console.error(e);
+      log('network error →', e?.message || e);
       alert("Impossible de joindre Home Assistant");
     }
   }
 
-  // Attach both ways so we’re sure the handler binds
   const btn = document.getElementById("activate");
   if (btn) {
     btn.addEventListener("click", triggerToy);
-    btn.setAttribute("onclick", "void(0)"); // prevents some odd defaults
-    setStatus('handler attached');
+    log('handler attached');
   } else {
-    setStatus('ERROR: button not found');
+    log('ERROR: button not found');
   }
 
-  // Extra: log unhandled errors
   window.addEventListener('error', (e) => console.error('JS error:', e.message));
 </script>
+
 
 
 </body>
