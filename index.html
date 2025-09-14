@@ -24,21 +24,51 @@
   <button id="activate">Activer le jouet</button>
 
   <script>
-    const HA_URL = "haintelligentclassroom.adaptatech.org";  // your Cloudflare tunnel hostname
-    const WEBHOOK_ID = "toy_relay";              // must match the webhook trigger in HA
+  const HA_URL = "https://haintelligentclassroom.adaptatech.org";
+  const WEBHOOK_ID = "toy_relay";
 
-    async function triggerToy() {
-      try {
-        const res = await fetch(`${HA_URL}/api/webhook/${WEBHOOK_ID}`, { method: "POST" });
-        if (!res.ok) alert("Erreur: " + res.status);
-      } catch (e) {
-        alert("Impossible de joindre Home Assistant");
-        console.error(e);
-      }
+  // UI helpers
+  const statusBox = document.createElement('div');
+  statusBox.style.position = 'fixed';
+  statusBox.style.bottom = '14px';
+  statusBox.style.left = '14px';
+  statusBox.style.padding = '8px 12px';
+  statusBox.style.borderRadius = '10px';
+  statusBox.style.background = 'rgba(0,0,0,.6)';
+  statusBox.style.font = '14px/1.3 system-ui, Arial';
+  statusBox.textContent = 'ready';
+  document.body.appendChild(statusBox);
+
+  function setStatus(t) { statusBox.textContent = t; console.log(t); }
+
+  async function triggerToy() {
+    setStatus('click → sending…');
+    try {
+      const url = `${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`; // cache-bust
+      const res = await fetch(url, { method: "POST", mode: "cors" });
+      setStatus(`response: ${res.status}`);
+      if (!res.ok) alert("Erreur: " + res.status);
+    } catch (e) {
+      setStatus('network error (see console)');
+      console.error(e);
+      alert("Impossible de joindre Home Assistant");
     }
+  }
 
-    document.getElementById("activate").addEventListener("click", triggerToy);
-  </script>
+  // Attach both ways so we’re sure the handler binds
+  const btn = document.getElementById("activate");
+  if (btn) {
+    btn.addEventListener("click", triggerToy);
+    btn.setAttribute("onclick", "void(0)"); // prevents some odd defaults
+    setStatus('handler attached');
+  } else {
+    setStatus('ERROR: button not found');
+  }
+
+  // Extra: log unhandled errors
+  window.addEventListener('error', (e) => console.error('JS error:', e.message));
+</script>
+
 
 </body>
 </html>
