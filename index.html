@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Contrôleur Adaptatech</title>
+  <style>
+    html, body {height: 100%; margin: 0; background: #0b0b0b; display: grid; place-items: center; color: white;}
+    button {
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 20px;
+      background: #294936;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+    button:active { transform: scale(0.97); }
+  </style>
+</head>
+<body>
+
+  <button id="activate">Activer le jouet</button>
+
+  <script>
+    const HA_URL = "https://ha.adaptatech.org";  // your Cloudflare tunnel hostname
+    const WEBHOOK_ID = "toy_relay";              // must match the webhook trigger in HA
+
+    async function triggerToy() {
+      try {
+        const res = await fetch(`${HA_URL}/api/webhook/${WEBHOOK_ID}`, { method: "POST" });
+        if (!res.ok) alert("Erreur: " + res.status);
+      } catch (e) {
+        alert("Impossible de joindre Home Assistant");
+        console.error(e);
+      }
+    }
+
+    document.getElementById("activate").addEventListener("click", triggerToy);
+  </script>
+
+</body>
+</html>
