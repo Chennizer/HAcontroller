@@ -1,104 +1,156 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Contrôleur 420Adaptatech</title>
-  <style>
-    html, body {
-      height: 100%; margin: 0;
-      background: #0b0b0b; display: grid; place-items: center;
-      color: white; text-align: center;
-    }
-    h1 {
-      font-size: clamp(1.5rem, 4vw, 2.5rem);
-      margin-bottom: 1rem;
-      color: #ADF1D2;
-    }
-    button {
-      font-size: clamp(1.5rem, 4vw, 2.5rem);
-      padding: 1rem 2rem;
-      border: none;
-      border-radius: 20px;
-      background: #294936;
-      color: white;
-      cursor: pointer;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-    }
-    button:active { transform: scale(0.97); }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contrôleur – EyeGaze (dwell)</title>
+<style>
+  :root{
+    --bg:#000; --fg:#fff;
+    --tile:#111; --tile-border:#333;
+    --fill: rgba(255,0,0,0.65);
+    --ok:#1ec97f; --err:#ff6b6b;
+    --size: clamp(260px, 50vmin, 520px);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    display:grid; place-items:center;
+    background:var(--bg); color:var(--fg);
+    font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    user-select:none; -webkit-tap-highlight-color: transparent;
+  }
+  .tile{
+    width:var(--size); height:var(--size);
+    display:grid; place-items:center;
+    background:var(--tile);
+    border:2px solid var(--tile-border);
+    border-radius:24px;
+    position:relative; overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);
+    touch-action:none; /* helps pointer events on touch */
+  }
+  /* On/Off icon (SVG) */
+  .icon{
+    width:40%; max-width:220px; aspect-ratio:1/1;
+    display:block;
+  }
+  .icon path{ fill:#ddd; transition:fill .2s ease }
+  .tile.active .icon path{ fill:var(--ok) }
+  .tile.error .icon path{ fill:var(--err) }
+
+  /* Red dwell fill overlay */
+  .fill{
+    position:absolute; inset:auto 0 0 0;
+    height:0%; background:var(--fill);
+    transition:height linear;
+    pointer-events:none;
+  }
+
+  /* Status chip (bottom-left) */
+  .hud{
+    position:fixed; left:12px; bottom:12px;
+    background:rgba(0,0,0,.55); color:#fff;
+    padding:8px 10px; border-radius:10px;
+    font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    max-width:80vw; white-space:pre; box-shadow:0 6px 20px rgba(0,0,0,.35);
+  }
+</style>
 </head>
 <body>
 
-  <!-- This heading will make it obvious if you are seeing the latest page -->
-  <h1>🚀 Version de test — Page mise à jour !</h1>
+<div class="tile" id="tile" aria-label="Activer / Désactiver">
+  <!-- simple power toggle icon -->
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
+  </svg>
+  <div class="fill" id="fill"></div>
+</div>
 
-  <button id="activate">Activer le jouet</button>
+<pre class="hud" id="hud">ready</pre>
 
-  <script>
-    console.log("✅ Controller script loaded");
+<script>
+  // ==== CONFIG ====
+  const HA_URL = "https://haintelligentclassroom.adaptatech.org";
+  const WEBHOOK_ID = "toy_relay";
 
-    const HA_URL = "https://haintelligentclassroom.adaptatech.org";
-    const WEBHOOK_ID = "toy_relay";
+  // dwell time (ms): default 1500, override with ?dwell=2000
+  const qs = new URLSearchParams(location.search);
+  const DWELL = Math.max(200, parseInt(qs.get('dwell')||'1500', 10));
 
-    // Tiny HUD
-    const hud = document.createElement('pre');
-    Object.assign(hud.style, {
-      position: 'fixed',
-      bottom: '12px',
-      left: '12px',
-      maxWidth: '80vw',
-      maxHeight: '40vh',
-      overflow: 'auto',
-      padding: '10px 12px',
-      background: 'rgba(0,0,0,.6)',
-      borderRadius: '10px',
-      font: '12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-      color: '#fff'
-    });
-    hud.textContent = 'ready';
-    document.body.appendChild(hud);
+  const tile = document.getElementById('tile');
+  const fill = document.getElementById('fill');
+  const hud  = document.getElementById('hud');
 
-    function log(...args) {
-      console.log("[Controller]", ...args);
-      hud.textContent = args.map(x => String(x)).join(' ');
+  let dwellTimer = null;
+  let armed = false;       // start dwell only when pointer actually enters
+  let firing = false;      // avoid double-fire
+
+  function log(...a){ console.log(...a); hud.textContent = a.map(x => String(x)).join(' '); }
+
+  function startFill(ms){
+    fill.style.transitionDuration = ms + 'ms';
+    // animate from 0 -> 100% height (bottom-up fill)
+    fill.style.height = '0%';
+    // next frame to apply end state
+    requestAnimationFrame(()=> requestAnimationFrame(()=> fill.style.height = '100%'));
+  }
+
+  function cancelFill(){
+    fill.style.transitionDuration = '0ms';
+    fill.style.height = '0%';
+  }
+
+  async function fire(){
+    if (firing) return;
+    firing = true;
+    tile.classList.remove('error');
+    tile.classList.add('active');
+    log('POST →', `${HA_URL}/api/webhook/${WEBHOOK_ID}`);
+
+    try{
+      const res = await fetch(`${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`, {
+        method: 'POST', cache:'no-store', credentials:'omit', redirect:'follow'
+      });
+      log(`status ${res.status}`);
+      // brief success pulse
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      setTimeout(()=> tile.classList.remove('active'), 450);
+    }catch(err){
+      tile.classList.add('error');
+      log('error:', err.message||err);
+      setTimeout(()=> tile.classList.remove('error'), 900);
+    }finally{
+      firing = false;
     }
+  }
 
-    async function triggerToy() {
-      log("🔘 Button clicked → sending...");
-      try {
-        const url = `${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`;
-        console.log("Fetch URL:", url);
-        const res = await fetch(url, {
-          method: "POST",
-          redirect: "follow",
-          cache: "no-store",
-          credentials: "omit"
-        });
-        const text = await res.text();
-        console.log("Fetch response:", res.status, res.url, text);
-        log(`✅ status ${res.status}`);
-        if (!res.ok) alert(`Erreur: ${res.status}`);
-      } catch (e) {
-        console.error("Network error:", e);
-        log("❌ network error:", e.message);
-      }
-    }
+  function beginDwell(){
+    if (dwellTimer || firing) return;
+    startFill(DWELL);
+    dwellTimer = setTimeout(()=>{ dwellTimer=null; cancelFill(); fire(); }, DWELL);
+  }
 
-    const btn = document.getElementById("activate");
-    if (btn) {
-      btn.addEventListener("click", triggerToy);
-      console.log("✅ Event listener attached to button");
-      log("handler attached");
-    } else {
-      console.error("❌ Button not found!");
-      log("ERROR: button not found");
-    }
+  function cancelDwell(){
+    if (dwellTimer){ clearTimeout(dwellTimer); dwellTimer=null; }
+    cancelFill();
+  }
 
-    window.addEventListener('error', (e) => {
-      console.error("JS error:", e.message, e);
-    });
-  </script>
+  // Pointer logic (works for mouse, touch, eye-tracker mouse emulation)
+  tile.addEventListener('pointerenter', ()=>{ armed=true; beginDwell(); });
+  tile.addEventListener('pointerleave', ()=>{ armed=false; cancelDwell(); });
 
+  // Touch support: some devices don’t emit enter/leave reliably
+  tile.addEventListener('pointerdown', ()=>{ armed=true; beginDwell(); });
+  tile.addEventListener('pointerup',   ()=>{ armed=false; cancelDwell(); });
+  tile.addEventListener('pointercancel',()=>{ armed=false; cancelDwell(); });
+  tile.addEventListener('pointerout', ()=>{ armed=false; cancelDwell(); });
+
+  // Fallback click (keyboard/assistive tech)
+  tile.addEventListener('click', (e)=>{ e.preventDefault(); cancelDwell(); fire(); });
+
+  // initial HUD
+  log(`ready · dwell=${DWELL}ms`);
+</script>
 </body>
 </html>
