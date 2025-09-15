@@ -8,7 +8,12 @@
     html, body {
       height: 100%; margin: 0;
       background: #0b0b0b; display: grid; place-items: center;
-      color: white;
+      color: white; text-align: center;
+    }
+    h1 {
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      margin-bottom: 1rem;
+      color: #ADF1D2;
     }
     button {
       font-size: clamp(1.5rem, 4vw, 2.5rem);
@@ -25,71 +30,74 @@
 </head>
 <body>
 
+  <!-- This heading will make it obvious if you are seeing the latest page -->
+  <h1>🚀 Version de test — Page mise à jour !</h1>
+
   <button id="activate">Activer le jouet</button>
 
   <script>
-  console.log("✅ Controller script loaded");
+    console.log("✅ Controller script loaded");
 
-  const HA_URL = "https://haintelligentclassroom.adaptatech.org";
-  const WEBHOOK_ID = "toy_relay";
+    const HA_URL = "https://haintelligentclassroom.adaptatech.org";
+    const WEBHOOK_ID = "toy_relay";
 
-  // Tiny HUD
-  const hud = document.createElement('pre');
-  Object.assign(hud.style, {
-    position: 'fixed',
-    bottom: '12px',
-    left: '12px',
-    maxWidth: '80vw',
-    maxHeight: '40vh',
-    overflow: 'auto',
-    padding: '10px 12px',
-    background: 'rgba(0,0,0,.6)',
-    borderRadius: '10px',
-    font: '12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-    color: '#fff'
-  });
-  hud.textContent = 'ready';
-  document.body.appendChild(hud);
+    // Tiny HUD
+    const hud = document.createElement('pre');
+    Object.assign(hud.style, {
+      position: 'fixed',
+      bottom: '12px',
+      left: '12px',
+      maxWidth: '80vw',
+      maxHeight: '40vh',
+      overflow: 'auto',
+      padding: '10px 12px',
+      background: 'rgba(0,0,0,.6)',
+      borderRadius: '10px',
+      font: '12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+      color: '#fff'
+    });
+    hud.textContent = 'ready';
+    document.body.appendChild(hud);
 
-  function log(...args) {
-    console.log("[Controller]", ...args);
-    hud.textContent = args.map(x => String(x)).join(' ');
-  }
-
-  async function triggerToy() {
-    log("🔘 Button clicked → sending...");
-    try {
-      const url = `${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`;
-      console.log("Fetch URL:", url);
-      const res = await fetch(url, {
-        method: "POST",
-        redirect: "follow",
-        cache: "no-store",
-        credentials: "omit"
-      });
-      const text = await res.text();
-      console.log("Fetch response:", res.status, res.url, text);
-      log(`✅ status ${res.status}`);
-      if (!res.ok) alert(`Erreur: ${res.status}`);
-    } catch (e) {
-      console.error("Network error:", e);
-      log("❌ network error:", e.message);
+    function log(...args) {
+      console.log("[Controller]", ...args);
+      hud.textContent = args.map(x => String(x)).join(' ');
     }
-  }
 
-  const btn = document.getElementById("activate");
-  if (btn) {
-    btn.addEventListener("click", triggerToy);
-    console.log("✅ Event listener attached to button");
-    log("handler attached");
-  } else {
-    console.error("❌ Button not found!");
-    log("ERROR: button not found");
-  }
+    async function triggerToy() {
+      log("🔘 Button clicked → sending...");
+      try {
+        const url = `${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`;
+        console.log("Fetch URL:", url);
+        const res = await fetch(url, {
+          method: "POST",
+          redirect: "follow",
+          cache: "no-store",
+          credentials: "omit"
+        });
+        const text = await res.text();
+        console.log("Fetch response:", res.status, res.url, text);
+        log(`✅ status ${res.status}`);
+        if (!res.ok) alert(`Erreur: ${res.status}`);
+      } catch (e) {
+        console.error("Network error:", e);
+        log("❌ network error:", e.message);
+      }
+    }
 
-  window.addEventListener('error', (e) => {
-    console.error("JS error:", e.message, e);
-  });
+    const btn = document.getElementById("activate");
+    if (btn) {
+      btn.addEventListener("click", triggerToy);
+      console.log("✅ Event listener attached to button");
+      log("handler attached");
+    } else {
+      console.error("❌ Button not found!");
+      log("ERROR: button not found");
+    }
+
+    window.addEventListener('error', (e) => {
+      console.error("JS error:", e.message, e);
+    });
   </script>
 
 </body>
