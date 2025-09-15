@@ -3,14 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Contrôleur – EyeGaze (dwell)</title>
+<title>Contrôleur — Dwell carré</title>
 <style>
   :root{
     --bg:#000; --fg:#fff;
     --tile:#111; --tile-border:#333;
-    --fill: rgba(255,0,0,0.65);
     --ok:#1ec97f; --err:#ff6b6b;
+    --fill: rgba(255,0,0,.65);
     --size: clamp(260px, 50vmin, 520px);
+    --dwell: 1500ms; /* JS updates from ?dwell= */
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -18,8 +19,9 @@
     display:grid; place-items:center;
     background:var(--bg); color:var(--fg);
     font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    user-select:none; -webkit-tap-highlight-color: transparent;
+    user-select:none; -webkit-tap-highlight-color:transparent;
   }
+
   .tile{
     width:var(--size); height:var(--size);
     display:grid; place-items:center;
@@ -28,26 +30,32 @@
     border-radius:24px;
     position:relative; overflow:hidden;
     box-shadow:0 10px 30px rgba(0,0,0,.5);
-    touch-action:none; /* helps pointer events on touch */
+    touch-action:none;
   }
-  /* On/Off icon (SVG) */
-  .icon{
-    width:40%; max-width:220px; aspect-ratio:1/1;
-    display:block;
-  }
+
+  /* Power icon */
+  .icon{ width:40%; max-width:220px; aspect-ratio:1/1; display:block }
   .icon path{ fill:#ddd; transition:fill .2s ease }
   .tile.active .icon path{ fill:var(--ok) }
-  .tile.error .icon path{ fill:var(--err) }
+  .tile.error  .icon path{ fill:var(--err) }
 
-  /* Red dwell fill overlay */
+  /* --- Dwell square fill from center ---
+     A square overlay scales from center: scale(0) → scale(1) */
   .fill{
-    position:absolute; inset:auto 0 0 0;
-    height:0%; background:var(--fill);
-    transition:height linear;
+    position:absolute; inset:0;
+    margin:auto; width:100%; height:100%;
+    background:var(--fill);
+    border-radius:inherit;           /* same rounded corners as tile */
+    transform: scale(0);
+    transform-origin: 50% 50%;
     pointer-events:none;
   }
+  .fill.filling{
+    transition: transform var(--dwell) linear;
+    transform: scale(1);
+  }
 
-  /* Status chip (bottom-left) */
+  /* Status chip (debug) */
   .hud{
     position:fixed; left:12px; bottom:12px;
     background:rgba(0,0,0,.55); color:#fff;
@@ -59,8 +67,8 @@
 </head>
 <body>
 
-<div class="tile" id="tile" aria-label="Activer / Désactiver">
-  <!-- simple power toggle icon -->
+<div class="tile" id="tile" aria-label="Activer (dwell)">
+  <!-- On/Off icon -->
   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
     <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
   </svg>
@@ -70,36 +78,29 @@
 <pre class="hud" id="hud">ready</pre>
 
 <script>
-  // ==== CONFIG ====
+  // === CONFIG ===
   const HA_URL = "https://haintelligentclassroom.adaptatech.org";
   const WEBHOOK_ID = "toy_relay";
-
-  // dwell time (ms): default 1500, override with ?dwell=2000
   const qs = new URLSearchParams(location.search);
-  const DWELL = Math.max(200, parseInt(qs.get('dwell')||'1500', 10));
+  const dwellMs = Math.max(200, parseInt(qs.get('dwell') || '1500', 10));
+  document.documentElement.style.setProperty('--dwell', dwellMs+'ms');
 
   const tile = document.getElementById('tile');
   const fill = document.getElementById('fill');
   const hud  = document.getElementById('hud');
 
   let dwellTimer = null;
-  let armed = false;       // start dwell only when pointer actually enters
-  let firing = false;      // avoid double-fire
+  let firing = false;
 
-  function log(...a){ console.log(...a); hud.textContent = a.map(x => String(x)).join(' '); }
+  const log = (...a)=>{ console.log(...a); hud.textContent = a.map(String).join(' '); };
 
-  function startFill(ms){
-    fill.style.transitionDuration = ms + 'ms';
-    // animate from 0 -> 100% height (bottom-up fill)
-    fill.style.height = '0%';
-    // next frame to apply end state
-    requestAnimationFrame(()=> requestAnimationFrame(()=> fill.style.height = '100%'));
+  function startFill(){
+    fill.classList.remove('filling'); // reset
+    // force reflow so the next class change animates from scale(0)
+    void fill.offsetWidth;
+    fill.classList.add('filling');
   }
-
-  function cancelFill(){
-    fill.style.transitionDuration = '0ms';
-    fill.style.height = '0%';
-  }
+  function cancelFill(){ fill.classList.remove('filling'); }
 
   async function fire(){
     if (firing) return;
@@ -110,10 +111,9 @@
 
     try{
       const res = await fetch(`${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`, {
-        method: 'POST', cache:'no-store', credentials:'omit', redirect:'follow'
+        method:'POST', cache:'no-store', credentials:'omit', redirect:'follow'
       });
       log(`status ${res.status}`);
-      // brief success pulse
       if (!res.ok) throw new Error('HTTP '+res.status);
       setTimeout(()=> tile.classList.remove('active'), 450);
     }catch(err){
@@ -127,30 +127,26 @@
 
   function beginDwell(){
     if (dwellTimer || firing) return;
-    startFill(DWELL);
-    dwellTimer = setTimeout(()=>{ dwellTimer=null; cancelFill(); fire(); }, DWELL);
+    startFill();
+    dwellTimer = setTimeout(()=>{ dwellTimer=null; cancelFill(); fire(); }, dwellMs);
   }
-
   function cancelDwell(){
     if (dwellTimer){ clearTimeout(dwellTimer); dwellTimer=null; }
     cancelFill();
   }
 
-  // Pointer logic (works for mouse, touch, eye-tracker mouse emulation)
-  tile.addEventListener('pointerenter', ()=>{ armed=true; beginDwell(); });
-  tile.addEventListener('pointerleave', ()=>{ armed=false; cancelDwell(); });
+  // Pointer-based dwell (mouse, touch, eyegaze cursor)
+  tile.addEventListener('pointerenter', beginDwell);
+  tile.addEventListener('pointerleave', cancelDwell);
+  tile.addEventListener('pointerdown', beginDwell);
+  tile.addEventListener('pointerup', cancelDwell);
+  tile.addEventListener('pointercancel', cancelDwell);
+  tile.addEventListener('pointerout', cancelDwell);
 
-  // Touch support: some devices don’t emit enter/leave reliably
-  tile.addEventListener('pointerdown', ()=>{ armed=true; beginDwell(); });
-  tile.addEventListener('pointerup',   ()=>{ armed=false; cancelDwell(); });
-  tile.addEventListener('pointercancel',()=>{ armed=false; cancelDwell(); });
-  tile.addEventListener('pointerout', ()=>{ armed=false; cancelDwell(); });
-
-  // Fallback click (keyboard/assistive tech)
+  // Keyboard/AT fallback
   tile.addEventListener('click', (e)=>{ e.preventDefault(); cancelDwell(); fire(); });
 
-  // initial HUD
-  log(`ready · dwell=${DWELL}ms`);
+  log(`ready · dwell=${dwellMs}ms (add ?dwell=2000 to URL to change)`);
 </script>
 </body>
 </html>
