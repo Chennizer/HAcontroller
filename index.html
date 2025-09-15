@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contrôleur Adaptatech</title>
   <style>
-    html, body {height: 100%; margin: 0; background: #0b0b0b; display: grid; place-items: center; color: white;}
+    html, body {
+      height: 100%; margin: 0;
+      background: #0b0b0b; display: grid; place-items: center;
+      color: white;
+    }
     button {
       font-size: clamp(1.5rem, 4vw, 2.5rem);
       padding: 1rem 2rem;
@@ -23,58 +27,70 @@
 
   <button id="activate">Activer le jouet</button>
 
- <script>
+  <script>
+  console.log("✅ Controller script loaded");
+
   const HA_URL = "https://haintelligentclassroom.adaptatech.org";
   const WEBHOOK_ID = "toy_relay";
 
   // Tiny HUD
   const hud = document.createElement('pre');
-  hud.style.position = 'fixed';
-  hud.style.bottom = '12px';
-  hud.style.left   = '12px';
-  hud.style.maxWidth = '80vw';
-  hud.style.maxHeight = '40vh';
-  hud.style.overflow = 'auto';
-  hud.style.padding = '10px 12px';
-  hud.style.background = 'rgba(0,0,0,.6)';
-  hud.style.borderRadius = '10px';
-  hud.style.font = '12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace';
-  hud.style.color = '#fff';
+  Object.assign(hud.style, {
+    position: 'fixed',
+    bottom: '12px',
+    left: '12px',
+    maxWidth: '80vw',
+    maxHeight: '40vh',
+    overflow: 'auto',
+    padding: '10px 12px',
+    background: 'rgba(0,0,0,.6)',
+    borderRadius: '10px',
+    font: '12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+    color: '#fff'
+  });
   hud.textContent = 'ready';
   document.body.appendChild(hud);
-  const log = (...args) => { console.log(...args); hud.textContent = args.map(x => String(x)).join(' '); };
+
+  function log(...args) {
+    console.log("[Controller]", ...args);
+    hud.textContent = args.map(x => String(x)).join(' ');
+  }
 
   async function triggerToy() {
+    log("🔘 Button clicked → sending...");
     try {
       const url = `${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`;
-      log('sending →', url);
+      console.log("Fetch URL:", url);
       const res = await fetch(url, {
-        method: "POST",         // no headers = no CORS preflight
-        redirect: "follow",     // show us if CF is redirecting/challenging
+        method: "POST",
+        redirect: "follow",
         cache: "no-store",
         credentials: "omit"
       });
       const text = await res.text();
-      log(`status ${res.status} @ ${res.url}\n${text.slice(0,200)}`);
+      console.log("Fetch response:", res.status, res.url, text);
+      log(`✅ status ${res.status}`);
       if (!res.ok) alert(`Erreur: ${res.status}`);
     } catch (e) {
-      log('network error →', e?.message || e);
-      alert("Impossible de joindre Home Assistant");
+      console.error("Network error:", e);
+      log("❌ network error:", e.message);
     }
   }
 
   const btn = document.getElementById("activate");
   if (btn) {
     btn.addEventListener("click", triggerToy);
-    log('handler attached');
+    console.log("✅ Event listener attached to button");
+    log("handler attached");
   } else {
-    log('ERROR: button not found');
+    console.error("❌ Button not found!");
+    log("ERROR: button not found");
   }
 
-  window.addEventListener('error', (e) => console.error('JS error:', e.message));
-</script>
-
-
+  window.addEventListener('error', (e) => {
+    console.error("JS error:", e.message, e);
+  });
+  </script>
 
 </body>
 </html>
