@@ -33,29 +33,27 @@
     touch-action:none;
   }
 
-  /* Power icon */
   .icon{ width:40%; max-width:220px; aspect-ratio:1/1; display:block }
   .icon path{ fill:#ddd; transition:fill .2s ease }
   .tile.active .icon path{ fill:var(--ok) }
   .tile.error  .icon path{ fill:var(--err) }
 
-  /* --- Dwell square fill from center ---
-     A square overlay scales from center: scale(0) → scale(1) */
+  /* Dwell square fill from center */
   .fill{
     position:absolute; inset:0;
     margin:auto; width:100%; height:100%;
     background:var(--fill);
-    border-radius:inherit;           /* same rounded corners as tile */
+    border-radius:inherit;
     transform: scale(0);
     transform-origin: 50% 50%;
-    pointer-events:none;
+    pointer-events:none;   /* important: overlay never steals hover/hit-test */
+    will-change: transform;
   }
   .fill.filling{
     transition: transform var(--dwell) linear;
     transform: scale(1);
   }
 
-  /* Status chip (debug) */
   .hud{
     position:fixed; left:12px; bottom:12px;
     background:rgba(0,0,0,.55); color:#fff;
@@ -63,12 +61,15 @@
     font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     max-width:80vw; white-space:pre; box-shadow:0 6px 20px rgba(0,0,0,.35);
   }
+
+  @media (prefers-reduced-motion: reduce){
+    .fill.filling{ transition-duration: 1ms; }
+  }
 </style>
 </head>
 <body>
 
-<div class="tile" id="tile" aria-label="Activer (dwell)">
-  <!-- On/Off icon -->
+<div class="tile" id="tile" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
     <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
   </svg>
@@ -81,8 +82,12 @@
   // === CONFIG ===
   const HA_URL = "https://haintelligentclassroom.adaptatech.org";
   const WEBHOOK_ID = "toy_relay";
+
   const qs = new URLSearchParams(location.search);
-  const dwellMs = Math.max(200, parseInt(qs.get('dwell') || '1500', 10));
+  const dwellMs     = Math.max(200, parseInt(qs.get('dwell')   || '1500', 10));
+  const outsideHold = Math.max(0,   parseInt(qs.get('outside') || '200',  10)); // must be outside this long before we consider cancel
+  const graceMs     = Math.max(0,   parseInt(qs.get('grace')   || '200',  10)); // extra grace before cancel after outsideHold
+  const cooldownMs  = Math.max(0,   parseInt(qs.get('cooldown')|| '600',  10)); // after fire
   document.documentElement.style.setProperty('--dwell', dwellMs+'ms');
 
   const tile = document.getElementById('tile');
@@ -90,63 +95,160 @@
   const hud  = document.getElementById('hud');
 
   let dwellTimer = null;
+  let outsideTimer = null;   // starts after a leave; only cancels *after* outsideHold
+  let graceTimer = null;     // small buffer after outsideHold before we actually cancel
+  let cooldownTimer = null;
+  let rAF = null;
+
   let firing = false;
+  let inCooldown = false;
+  let dwelling = false;
+
+  let lastPos = { x: 0, y: 0 };  // always up-to-date mouse/gaze coords
 
   const log = (...a)=>{ console.log(...a); hud.textContent = a.map(String).join(' '); };
 
   function startFill(){
-    fill.classList.remove('filling'); // reset
-    // force reflow so the next class change animates from scale(0)
-    void fill.offsetWidth;
-    fill.classList.add('filling');
+    fill.classList.remove('filling'); void fill.offsetWidth; fill.classList.add('filling');
   }
   function cancelFill(){ fill.classList.remove('filling'); }
 
+  function clear(id){ if (id) clearTimeout(id); return null; }
+
+  function elContainsPoint(el, x, y){
+    const at = document.elementFromPoint(x, y);
+    return !!(at && (at === el || el.contains(at)));
+  }
+
+  function pointerWithin(el, x, y){
+    const r = el.getBoundingClientRect();
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) return false;
+    return elContainsPoint(el, x, y);
+  }
+
   async function fire(){
-    if (firing) return;
-    firing = true;
-    tile.classList.remove('error');
-    tile.classList.add('active');
+    if (firing || inCooldown) return;
+    firing = true; inCooldown = true;
+    tile.classList.remove('error'); tile.classList.add('active');
     log('POST →', `${HA_URL}/api/webhook/${WEBHOOK_ID}`);
 
     try{
+      const controller = new AbortController();
+      const to = setTimeout(()=>controller.abort('timeout'), 8000);
       const res = await fetch(`${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`, {
-        method:'POST', cache:'no-store', credentials:'omit', redirect:'follow'
+        method:'POST', cache:'no-store', credentials:'omit', redirect:'follow', signal: controller.signal
       });
+      clearTimeout(to);
       log(`status ${res.status}`);
       if (!res.ok) throw new Error('HTTP '+res.status);
-      setTimeout(()=> tile.classList.remove('active'), 450);
     }catch(err){
       tile.classList.add('error');
-      log('error:', err.message||err);
+      log('error:', (err && err.message) || err || 'network');
       setTimeout(()=> tile.classList.remove('error'), 900);
     }finally{
+      setTimeout(()=> tile.classList.remove('active'), 450);
       firing = false;
+      cooldownTimer = clear(cooldownTimer);
+      cooldownTimer = setTimeout(()=>{ inCooldown = false; }, cooldownMs);
     }
   }
 
-  function beginDwell(){
-    if (dwellTimer || firing) return;
-    startFill();
-    dwellTimer = setTimeout(()=>{ dwellTimer=null; cancelFill(); fire(); }, dwellMs);
-  }
-  function cancelDwell(){
-    if (dwellTimer){ clearTimeout(dwellTimer); dwellTimer=null; }
+  function stopDwell(){
+    dwelling = false;
+    dwellTimer = clear(dwellTimer);
+    outsideTimer = clear(outsideTimer);
+    graceTimer = clear(graceTimer);
     cancelFill();
   }
 
-  // Pointer-based dwell (mouse, touch, eyegaze cursor)
-  tile.addEventListener('pointerenter', beginDwell);
-  tile.addEventListener('pointerleave', cancelDwell);
-  tile.addEventListener('pointerdown', beginDwell);
-  tile.addEventListener('pointerup', cancelDwell);
-  tile.addEventListener('pointercancel', cancelDwell);
-  tile.addEventListener('pointerout', cancelDwell);
+  function beginDwell(){
+    if (dwelling || firing || inCooldown) return;
+    dwelling = true;
+    startFill();
+    dwellTimer = setTimeout(()=>{ stopDwell(); fire(); }, dwellMs);
+    // Lightweight watchdog: validate we stay inside while timer runs.
+    watchInside();
+  }
 
-  // Keyboard/AT fallback
-  tile.addEventListener('click', (e)=>{ e.preventDefault(); cancelDwell(); fire(); });
+  function watchInside(){
+    if (!dwelling) return;
+    rAF = requestAnimationFrame(()=>{
+      const insideByPoint = pointerWithin(tile, lastPos.x, lastPos.y);
+      // For mouse, :hover is a reliable additional signal
+      const insideHover = tile.matches(':hover');
+      if (!insideByPoint && !insideHover){
+        // don't cancel immediately; start outside hold timing if not already started
+        if (!outsideTimer){
+          outsideTimer = setTimeout(()=>{
+            // After being outside for outsideHold, give a small grace window to allow fast re-entry
+            graceTimer = clear(graceTimer);
+            if (graceMs <= 0){
+              stopDwell();
+            }else{
+              graceTimer = setTimeout(()=>{
+                // Before final cancel, double-check again
+                const stillOut = !pointerWithin(tile, lastPos.x, lastPos.y) && !tile.matches(':hover');
+                if (stillOut) stopDwell();
+              }, graceMs);
+            }
+          }, outsideHold);
+        }
+      }else{
+        // we're inside; clear any pending outside/grace cancels
+        outsideTimer = clear(outsideTimer);
+        graceTimer = clear(graceTimer);
+      }
+      watchInside();
+    });
+  }
 
-  log(`ready · dwell=${dwellMs}ms (add ?dwell=2000 to URL to change)`);
+  // ===== Pointer events =====
+  tile.addEventListener('pointerenter', (e)=>{
+    lastPos = {x: e.clientX, y: e.clientY};
+    outsideTimer = clear(outsideTimer);
+    graceTimer = clear(graceTimer);
+    beginDwell();
+  });
+
+  tile.addEventListener('pointermove', (e)=>{
+    lastPos = {x: e.clientX, y: e.clientY}; // always update—no jitter gate
+  });
+
+  // Do NOT immediately cancel on leave; just arm outsideTimer.
+  tile.addEventListener('pointerleave', (e)=>{
+    lastPos = {x: e.clientX, y: e.clientY};
+    // If elementFromPoint says we're still effectively on the tile (e.g., border/SVG), ignore
+    if (elContainsPoint(tile, lastPos.x, lastPos.y)) return;
+    // Outside timing handled by watchdog; nothing to do here.
+  });
+
+  // Some drivers send only down/up. Treat press as a strong “enter”.
+  tile.addEventListener('pointerdown', (e)=>{
+    lastPos = {x: e.clientX, y: e.clientY};
+    outsideTimer = clear(outsideTimer);
+    graceTimer = clear(graceTimer);
+    beginDwell();
+  });
+  tile.addEventListener('pointerup', (e)=>{
+    lastPos = {x: e.clientX, y: e.clientY};
+    // Let watchdog decide if we left
+  });
+  tile.addEventListener('pointercancel', (e)=>{
+    lastPos = {x: e.clientX, y: e.clientY};
+    // Let watchdog decide
+  });
+
+  // Explicit trigger (click / keyboard)
+  tile.addEventListener('click', (e)=>{ e.preventDefault(); stopDwell(); fire(); });
+  tile.addEventListener('keydown', (e)=>{
+    if (e.code === 'Space' || e.code === 'Enter'){ e.preventDefault(); stopDwell(); fire(); }
+  });
+
+  // Page hidden → cancel safely
+  document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
+
+  log(`ready · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms
+(For mouse testing: try ?outside=250&grace=250 for max stickiness)`);
 </script>
 </body>
 </html>
