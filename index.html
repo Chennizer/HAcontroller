@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta http-equiv="Cache-Control" content="no-store" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Contrôleur — Dwell carré</title>
+<title>Contrôleur — Dwell & Multi-boutons</title>
 <style>
   :root{
     --bg:#000; --fg:#fff;
@@ -13,6 +13,7 @@
     --fill: rgba(255,0,0,.65);
     --size: clamp(260px, 50vmin, 520px);
     --dwell: 1500ms; /* JS updates from ?dwell= */
+    --panel-bg:#ffffff; --panel-fg:#000;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -27,7 +28,8 @@
   #settingsIcon{
     position:fixed; top:14px; right:14px;
     width:44px; height:44px; border-radius:50%;
-    background:#ffffff; color:#000; border:2px solid #ff2a8a;
+    background:var(--panel-bg); color:var(--panel-fg);
+    border:2px solid #ff2a8a;
     display:flex; align-items:center; justify-content:center;
     font-size:22px; line-height:1;
     cursor:pointer; z-index:10010;
@@ -38,25 +40,28 @@
   /* ===== Options panel ===== */
   #menuPanel{
     position:fixed; top:70px; right:14px;
-    width:min(320px, 92vw);
-    background:#ffffff; color:#000;
+    width:min(380px, 92vw);
+    background:var(--panel-bg); color:var(--panel-fg);
     border:2px solid #111; border-radius:12px;
     box-shadow:0 20px 50px rgba(0,0,0,.55);
-    padding:12px; z-index:10011;
+    padding:14px; z-index:10011;
     display:none;
   }
   #menuPanel.show{ display:block; }
-  #menuPanel h2{ margin:0 0 8px; font-size:16px; }
+  #menuPanel h2{ margin:0 0 10px; font-size:18px; }
+  #menuPanel h3{ margin:12px 0 6px; font-size:15px; }
   #menuPanel label{ display:block; font-weight:600; margin:8px 0 6px; }
-  #menuPanel select{
+  #menuPanel .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  #menuPanel select, #menuPanel input[type="text"]{
     width:100%;
     background:#fff; color:#000;
     border:2px solid #222; border-radius:10px;
     padding:10px 12px; outline:none; font:inherit;
-    max-height:40vh; overflow:auto;
   }
+  #menuPanel .radio{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
   #menuPanel .hint{ font-size:12px; color:#333; margin-top:8px; }
 
+  /* ===== Dwell tile ===== */
   .tile{
     width:var(--size); height:var(--size);
     display:grid; place-items:center;
@@ -67,13 +72,11 @@
     box-shadow:0 10px 30px rgba(0,0,0,.5);
     touch-action:none;
   }
-
   .icon{ width:40%; max-width:220px; aspect-ratio:1/1; display:block }
   .icon path{ fill:#ddd; transition:fill .2s ease }
   .tile.active .icon path{ fill:var(--ok) }
   .tile.error  .icon path{ fill:var(--err) }
 
-  /* Dwell square fill from center */
   .fill{
     position:absolute; inset:0;
     margin:auto; width:100%; height:100%;
@@ -83,12 +86,33 @@
     transform-origin: 50% 50%;
     pointer-events:none;
     will-change: transform;
-    z-index:1; /* beneath the gear/menu (which are outside anyway) */
+    z-index:1;
   }
-  .fill.filling{
-    transition: transform var(--dwell) linear;
-    transform: scale(1);
+  .fill.filling{ transition: transform var(--dwell) linear; transform: scale(1); }
+
+  /* ===== Multi-buttons ===== */
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+    gap:16px;
+    width:min(920px, 94vw);
   }
+  .grid.four{ grid-template-columns: repeat(4, minmax(140px, 1fr)); }
+  .btnCard{
+    background:#101010; border:2px solid #2b2b2b; border-radius:16px;
+    box-shadow:0 8px 24px rgba(0,0,0,.35);
+    overflow:hidden; cursor:pointer; position:relative;
+    display:flex; flex-direction:column; align-items:center; justify-content:stretch;
+  }
+  .btnCard:focus{ outline:3px solid #5bc0de; outline-offset:2px; }
+  .pic{
+    width:100%; aspect-ratio:16/10; display:block; background:#181818; object-fit:cover;
+  }
+  .label{
+    width:100%; padding:10px 12px; text-align:center; color:#ddd; font-weight:700;
+    border-top:1px solid #2b2b2b;
+  }
+  .btnCard:active .label{ filter:brightness(1.1); }
 
   .hud{
     position:fixed; left:12px; bottom:12px;
@@ -111,44 +135,120 @@
 
 <div id="menuPanel" role="dialog" aria-label="Options">
   <h2>Options</h2>
-  <label for="actionSelect">Action du carré (dwell)</label>
-  <select id="actionSelect" aria-label="Choisir l'action">
-    <option value="relay">Relais Tuya — impulsion</option>
+
+  <h3>Mode de déclenchement</h3>
+  <div class="radio" role="radiogroup" aria-label="Mode">
+    <label><input type="radio" name="mode" value="dwell"> Carré (dwell)</label>
+    <label><input type="radio" name="mode" value="buttons2"> 2 boutons (toy_relay + tuyarelay)</label>
+    <label><input type="radio" name="mode" value="buttons4"> 4 boutons (tous)</label>
+  </div>
+
+  <h3>Action du carré (dwell)</h3>
+  <label for="actionSelect">Action sélectionnée</label>
+  <select id="actionSelect" aria-label="Choisir l'action du carré">
+    <option value="relay">Relais Tuya — tuyarelay</option>
     <option value="plug">Prise — toy_relay</option>
+    <option value="plug2">Prise 2 — plug2</option>
+    <option value="relay2">Relais 2 — tuyarelay2</option>
   </select>
-  <div class="hint">Le carré déclenchera l’action sélectionnée.</div>
+
+  <h3>Webhooks (modifiables)</h3>
+  <div class="row">
+    <label for="whPlug">toy_relay URL</label>
+    <input type="text" id="whPlug" placeholder="https://.../api/webhook/toy_relay">
+  </div>
+  <div class="row">
+    <label for="whRelay">tuyarelay URL</label>
+    <input type="text" id="whRelay" placeholder="https://.../api/webhook/tuyarelay">
+  </div>
+  <div class="row">
+    <label for="whPlug2">plug2 URL</label>
+    <input type="text" id="whPlug2" placeholder="https://.../api/webhook/plug2">
+  </div>
+  <div class="row">
+    <label for="whRelay2">tuyarelay2 URL</label>
+    <input type="text" id="whRelay2" placeholder="https://.../api/webhook/tuyarelay2">
+  </div>
+  <div class="hint">Astuce : utilise ton sous-domaine Cloudflare Tunnel (HTTPS) pour tous.</div>
 </div>
 
-<!-- Dwell tile -->
-<div class="tile" id="tile" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
+<!-- ===== Dwell tile ===== -->
+<div id="dwellWrap" class="tile" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
     <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
   </svg>
   <div class="fill" id="fill"></div>
 </div>
 
+<!-- ===== Buttons (2) ===== -->
+<div id="buttons2Wrap" class="grid" style="display:none" aria-label="Panneau 2 boutons">
+  <button class="btnCard" id="btnPlug" aria-label="Prise — toy_relay">
+    <img class="pic" alt="toy_relay" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>toy_relay</text></svg>">
+    <div class="label">toy_relay</div>
+  </button>
+  <button class="btnCard" id="btnRelay" aria-label="Relais — tuyarelay">
+    <img class="pic" alt="tuyarelay" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>tuyarelay</text></svg>">
+    <div class="label">tuyarelay</div>
+  </button>
+</div>
+
+<!-- ===== Buttons (4) ===== -->
+<div id="buttons4Wrap" class="grid four" style="display:none" aria-label="Panneau 4 boutons">
+  <button class="btnCard" id="btnPlug_4" aria-label="Prise — toy_relay">
+    <img class="pic" alt="toy_relay" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>toy_relay</text></svg>">
+    <div class="label">toy_relay</div>
+  </button>
+  <button class="btnCard" id="btnRelay_4" aria-label="Relais — tuyarelay">
+    <img class="pic" alt="tuyarelay" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>tuyarelay</text></svg>">
+    <div class="label">tuyarelay</div>
+  </button>
+  <button class="btnCard" id="btnPlug2_4" aria-label="Prise 2 — plug2">
+    <img class="pic" alt="plug2" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>plug2</text></svg>">
+    <div class="label">plug2</div>
+  </button>
+  <button class="btnCard" id="btnRelay2_4" aria-label="Relais 2 — tuyarelay2">
+    <img class="pic" alt="tuyarelay2" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>tuyarelay2</text></svg>">
+    <div class="label">tuyarelay2</div>
+  </button>
+</div>
+
 <pre class="hud" id="hud">ready</pre>
 
 <script>
-  // Optional: nuke any stale service worker caching this path
+  // Optional: unregister any SW so updates show
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
   }
 
-  // === CONFIG (Cloudflare Tunnel for both actions) ===
+  // ===== Defaults (Cloudflare Tunnel base) =====
   const TUNNEL = "https://haintelligentclassroom.adaptatech.org";
-  const URL_RELAY_GO = `${TUNNEL}/api/webhook/tuyarelay`;  // Relais Tuya
-  const URL_PLUG_ON  = `${TUNNEL}/api/webhook/toy_relay`;  // Prise
+  const DEFAULTS = {
+    plug:   `${TUNNEL}/api/webhook/toy_relay`,
+    relay:  `${TUNNEL}/api/webhook/tuyarelay`,
+    plug2:  `${TUNNEL}/api/webhook/plug2`,
+    relay2: `${TUNNEL}/api/webhook/tuyarelay2`,
+  };
 
-  // UI refs
+  // ===== UI refs =====
   const settingsIcon = document.getElementById('settingsIcon');
-  const menuPanel    = document.getElementById('menuPanel');
-  const select       = document.getElementById('actionSelect');
-  const tile = document.getElementById('tile');
-  const fill = document.getElementById('fill');
-  const hud  = document.getElementById('hud');
+  const menuPanel = document.getElementById('menuPanel');
+  const select = document.getElementById('actionSelect');
 
-  // Toggle menu
+  const whPlug   = document.getElementById('whPlug');
+  const whRelay  = document.getElementById('whRelay');
+  const whPlug2  = document.getElementById('whPlug2');
+  const whRelay2 = document.getElementById('whRelay2');
+
+  const dwellWrap    = document.getElementById('dwellWrap');
+  const buttons2Wrap = document.getElementById('buttons2Wrap');
+  const buttons4Wrap = document.getElementById('buttons4Wrap');
+
+  const hud  = document.getElementById('hud');
+  const fill = document.getElementById('fill');
+
+  const modeRadios = () => [...document.querySelectorAll('input[name="mode"]')];
+
+  // ===== Toggle menu =====
   function toggleMenu(force){
     const willShow = (typeof force === 'boolean') ? force : !menuPanel.classList.contains('show');
     menuPanel.classList.toggle('show', willShow);
@@ -159,59 +259,82 @@
     if (!menuPanel.contains(e.target) && !settingsIcon.contains(e.target)) toggleMenu(false);
   });
 
-  // Initial selection via ?action=relay|plug or saved value
-  const qs = new URLSearchParams(location.search);
-  const saved = localStorage.getItem('controller_action');
-  const initialAction = (qs.get('action') || saved || 'relay').toLowerCase();
-  if ([...select.options].some(o => o.value === initialAction)) {
-    select.value = initialAction;
-  }
-  select.addEventListener('change', () => {
-    localStorage.setItem('controller_action', select.value);
-    log(`action=${select.value}`);
-  });
+  // ===== LocalStorage helpers =====
+  const LS = {
+    get(k, def){ try{ const v = localStorage.getItem(k); return v ?? def; }catch{return def;} },
+    set(k, v){ try{ localStorage.setItem(k, v); }catch{} }
+  };
 
-  // Dwell tunables (query string)
+  // Load URLs from LS or defaults
+  function loadUrls(){
+    whPlug.value   = LS.get('wh_plug',   DEFAULTS.plug);
+    whRelay.value  = LS.get('wh_relay',  DEFAULTS.relay);
+    whPlug2.value  = LS.get('wh_plug2',  DEFAULTS.plug2);
+    whRelay2.value = LS.get('wh_relay2', DEFAULTS.relay2);
+  }
+  function saveUrls(){
+    LS.set('wh_plug',   whPlug.value.trim());
+    LS.set('wh_relay',  whRelay.value.trim());
+    LS.set('wh_plug2',  whPlug2.value.trim());
+    LS.set('wh_relay2', whRelay2.value.trim());
+  }
+  [whPlug, whRelay, whPlug2, whRelay2].forEach(inp => inp.addEventListener('change', saveUrls));
+
+  function getUrl(action){
+    if (action === 'plug')   return (whPlug.value   || DEFAULTS.plug);
+    if (action === 'relay')  return (whRelay.value  || DEFAULTS.relay);
+    if (action === 'plug2')  return (whPlug2.value  || DEFAULTS.plug2);
+    if (action === 'relay2') return (whRelay2.value || DEFAULTS.relay2);
+    return DEFAULTS.relay;
+  }
+
+  // ===== Mode handling =====
+  function setMode(mode){
+    LS.set('ui_mode', mode);
+    dwellWrap.style.display    = (mode === 'dwell')    ? '' : 'none';
+    buttons2Wrap.style.display = (mode === 'buttons2') ? '' : 'none';
+    buttons4Wrap.style.display = (mode === 'buttons4') ? '' : 'none';
+    modeRadios().forEach(r => r.checked = (r.value === mode));
+    log('mode=', mode);
+  }
+  modeRadios().forEach(r => r.addEventListener('change', () => setMode(r.value)));
+
+  // ===== Initial selection =====
+  const qs = new URLSearchParams(location.search);
+  const initialAction = (qs.get('action') || LS.get('dwell_action', 'relay')).toLowerCase();
+  const initialMode   = (qs.get('mode') || LS.get('ui_mode', 'dwell')).toLowerCase();
+
+  // Fill dropdown and persist
+  select.value = ['relay','plug','plug2','relay2'].includes(initialAction) ? initialAction : 'relay';
+  select.addEventListener('change', () => { LS.set('dwell_action', select.value); log('dwell action=', select.value); });
+
+  // Dwell/cancel tunables
   const dwellMs     = Math.max(200, parseInt(qs.get('dwell')   || '1500', 10));
   const outsideHold = Math.max(0,   parseInt(qs.get('outside') || '200',  10));
   const graceMs     = Math.max(0,   parseInt(qs.get('grace')   || '200',  10));
   const cooldownMs  = Math.max(0,   parseInt(qs.get('cooldown')|| '600',  10));
   document.documentElement.style.setProperty('--dwell', dwellMs+'ms');
 
+  // ===== Dwell logic =====
   let outsideTimer = null, graceTimer = null, cooldownTimer = null;
   let firing = false, inCooldown = false, dwelling = false;
   let lastPos = { x: 0, y: 0 };
 
-  const log = (...a)=>{ console.log(...a); hud.textContent = a.map(String).join(' '); };
-
-  function startFill(){
-    fill.classList.remove('filling'); void fill.offsetWidth; fill.classList.add('filling');
-  }
+  function startFill(){ fill.classList.remove('filling'); void fill.offsetWidth; fill.classList.add('filling'); }
   function cancelFill(){ fill.classList.remove('filling'); }
   function clearTO(id){ if (id) clearTimeout(id); return null; }
-
-  function elContainsPoint(el, x, y){
-    const at = document.elementFromPoint(x, y);
-    return !!(at && (at === el || el.contains(at)));
-  }
+  function elContainsPoint(el, x, y){ const at = document.elementFromPoint(x, y); return !!(at && (at === el || el.contains(at))); }
   function pointerWithin(el, x, y){
     const r = el.getBoundingClientRect();
     if (x < r.left || x > r.right || y < r.top || y > r.bottom) return false;
     return elContainsPoint(el, x, y);
   }
 
-  function currentUrl(){
-    return (select.value === 'plug') ? URL_PLUG_ON : URL_RELAY_GO;
-  }
-
-  async function fire(){
+  async function fireUrl(url, actionLabel){
     if (firing || inCooldown) return;
     firing = true; inCooldown = true;
-    tile.classList.remove('error'); tile.classList.add('active');
-
-    const action = select.value;
-    const url = currentUrl();
-    log('POST →', url, '· action=', action);
+    dwellWrap.classList.remove('error'); dwellWrap.classList.add('active');
+    log('POST →', url);
 
     try{
       const controller = new AbortController();
@@ -219,18 +342,18 @@
       const res = await fetch(url + `?t=${Date.now()}`, {
         method:'POST',
         headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ from:"github-page", action }),
+        body: JSON.stringify({ from:"github-page", action: actionLabel }),
         cache:'no-store', credentials:'omit', redirect:'follow', signal: controller.signal
       });
       clearTimeout(to);
       log(`status ${res.status}`);
       if (!res.ok) throw new Error('HTTP '+res.status);
     }catch(err){
-      tile.classList.add('error');
+      dwellWrap.classList.add('error');
       log('error:', (err && err.message) || err || 'network');
-      setTimeout(()=> tile.classList.remove('error'), 900);
+      setTimeout(()=> dwellWrap.classList.remove('error'), 900);
     }finally{
-      setTimeout(()=> tile.classList.remove('active'), 450);
+      setTimeout(()=> dwellWrap.classList.remove('active'), 450);
       firing = false;
       cooldownTimer = clearTO(cooldownTimer);
       cooldownTimer = setTimeout(()=>{ inCooldown = false; }, cooldownMs);
@@ -248,13 +371,12 @@
     if (dwelling || firing || inCooldown) return;
     dwelling = true;
     startFill();
-    const tm = setTimeout(()=>{ stopDwell(); fire(); }, dwellMs);
-    // watchdog to confirm we stay inside
+    setTimeout(()=>{ stopDwell(); fireUrl(getUrl(select.value), select.value); }, dwellMs);
     (function watchInside(){
       if (!dwelling) return;
       requestAnimationFrame(()=>{
-        const insideByPoint = pointerWithin(tile, lastPos.x, lastPos.y);
-        const insideHover = tile.matches(':hover');
+        const insideByPoint = pointerWithin(dwellWrap, lastPos.x, lastPos.y);
+        const insideHover = dwellWrap.matches(':hover');
         if (!insideByPoint && !insideHover){
           if (!outsideTimer){
             outsideTimer = setTimeout(()=>{
@@ -262,7 +384,7 @@
               else{
                 graceTimer = clearTO(graceTimer);
                 graceTimer = setTimeout(()=>{
-                  const stillOut = !pointerWithin(tile, lastPos.x, lastPos.y) && !tile.matches(':hover');
+                  const stillOut = !pointerWithin(dwellWrap, lastPos.x, lastPos.y) && !dwellWrap.matches(':hover');
                   if (stillOut) stopDwell();
                 }, graceMs);
               }
@@ -277,38 +399,55 @@
     })();
   }
 
-  // Pointer events
-  tile.addEventListener('pointerenter', (e)=>{
+  // Dwell events
+  dwellWrap.addEventListener('pointerenter', (e)=>{
     lastPos = {x: e.clientX, y: e.clientY};
     outsideTimer = clearTO(outsideTimer);
     graceTimer = clearTO(graceTimer);
     beginDwell();
   });
-  tile.addEventListener('pointermove', (e)=>{ lastPos = {x: e.clientX, y: e.clientY}; });
-  tile.addEventListener('pointerleave', (e)=>{
+  dwellWrap.addEventListener('pointermove', (e)=>{ lastPos = {x: e.clientX, y: e.clientY}; });
+  dwellWrap.addEventListener('pointerleave', (e)=>{
     lastPos = {x: e.clientX, y: e.clientY};
-    if (elContainsPoint(tile, lastPos.x, lastPos.y)) return;
+    if (elContainsPoint(dwellWrap, lastPos.x, lastPos.y)) return;
   });
-  tile.addEventListener('pointerdown', (e)=>{
+  dwellWrap.addEventListener('pointerdown', (e)=>{
     lastPos = {x: e.clientX, y: e.clientY};
     outsideTimer = clearTO(outsideTimer);
     graceTimer = clearTO(graceTimer);
     beginDwell();
   });
-  tile.addEventListener('pointerup',   (e)=>{ lastPos = {x: e.clientX, y: e.clientY}; });
-  tile.addEventListener('pointercancel',(e)=>{ lastPos = {x: e.clientX, y: e.clientY}; });
-
-  // Click / keyboard
-  tile.addEventListener('click', (e)=>{ e.preventDefault(); stopDwell(); fire(); });
-  tile.addEventListener('keydown', (e)=>{
-    if (e.code === 'Space' || e.code === 'Enter'){ e.preventDefault(); stopDwell(); fire(); }
+  dwellWrap.addEventListener('click', (e)=>{ e.preventDefault(); stopDwell(); fireUrl(getUrl(select.value), select.value); });
+  dwellWrap.addEventListener('keydown', (e)=>{
+    if (e.code === 'Space' || e.code === 'Enter'){ e.preventDefault(); stopDwell(); fireUrl(getUrl(select.value), select.value); }
   });
-
-  // Track pointer
   window.addEventListener('pointermove', (e)=>{ lastPos = {x: e.clientX, y: e.clientY}; }, {passive:true});
 
-  log(`ready · action=${select.value} · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms
-(Click the ⚙️ to choose which webhook to fire)`);
+  // ===== Buttons events =====
+  function bindButton(id, action){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', ()=> fireUrl(getUrl(action), action));
+    el.addEventListener('keydown', (e)=>{ if (e.code==='Space'||e.code==='Enter'){ e.preventDefault(); fireUrl(getUrl(action), action); }});
+  }
+  // 2-button panel
+  bindButton('btnPlug',  'plug');
+  bindButton('btnRelay', 'relay');
+  // 4-button panel
+  bindButton('btnPlug_4',   'plug');
+  bindButton('btnRelay_4',  'relay');
+  bindButton('btnPlug2_4',  'plug2');
+  bindButton('btnRelay2_4', 'relay2');
+
+  // ===== HUD logger =====
+  function log(...a){ console.log(...a); hud.textContent = a.map(String).join(' '); }
+
+  // ===== Init =====
+  loadUrls();
+  setMode(['dwell','buttons2','buttons4'].includes(initialMode) ? initialMode : 'dwell');
+  document.querySelector(`input[name="mode"][value="${initialMode}"]`)?.setAttribute('checked','checked');
+  log(`ready · mode=${initialMode} · dwell=${dwellMs}ms`);
+
 </script>
 </body>
 </html>
