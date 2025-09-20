@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Cache-Control" content="no-store" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Contrôleur — Dwell carré</title>
 <style>
@@ -11,7 +12,7 @@
     --ok:#1ec97f; --err:#ff6b6b;
     --fill: rgba(255,0,0,.65);
     --size: clamp(260px, 50vmin, 520px);
-    --dwell: 1500ms; /* JS updated from ?dwell= */
+    --dwell: 1500ms; /* JS updates from ?dwell= */
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -22,24 +23,39 @@
     -webkit-tap-highlight-color:transparent;
   }
 
-  /* ===== SUPER-VISIBLE PICKER (fixed, white, huge z-index) ===== */
-  .toolbar{
-    position:fixed; top:12px; left:50%; transform:translateX(-50%);
-    display:flex; align-items:center; gap:12px;
-    background:#fff; color:#000; border:2px solid #ff2a8a;
-    border-radius:12px; padding:10px 14px;
-    box-shadow:0 16px 40px rgba(0,0,0,.5);
-    z-index:999999; pointer-events:auto;
-    max-width:95vw;
+  /* ===== Gear button (top-right) ===== */
+  #settingsIcon{
+    position:fixed; top:14px; right:14px;
+    width:44px; height:44px; border-radius:50%;
+    background:#ffffff; color:#000; border:2px solid #ff2a8a;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; line-height:1;
+    cursor:pointer; z-index:10010;
+    box-shadow:0 10px 30px rgba(0,0,0,.6);
   }
-  .toolbar label{ font-weight:700; color:#111; }
-  .toolbar select{
-    min-width:260px; max-width:70vw;
-    background:#fff; color:#000; user-select:auto;
-    border:2px solid #222; border-radius:10px; padding:10px 12px; outline:none;
+  #settingsIcon:active{ transform:scale(.98); }
+
+  /* ===== Options panel ===== */
+  #menuPanel{
+    position:fixed; top:70px; right:14px;
+    width:min(320px, 92vw);
+    background:#ffffff; color:#000;
+    border:2px solid #111; border-radius:12px;
+    box-shadow:0 20px 50px rgba(0,0,0,.55);
+    padding:12px; z-index:10011;
+    display:none;
   }
-  /* Optional: make it a permanently open, scrollable list */
-  /* .toolbar select { height:160px; }  */
+  #menuPanel.show{ display:block; }
+  #menuPanel h2{ margin:0 0 8px; font-size:16px; }
+  #menuPanel label{ display:block; font-weight:600; margin:8px 0 6px; }
+  #menuPanel select{
+    width:100%;
+    background:#fff; color:#000;
+    border:2px solid #222; border-radius:10px;
+    padding:10px 12px; outline:none; font:inherit;
+    max-height:40vh; overflow:auto;
+  }
+  #menuPanel .hint{ font-size:12px; color:#333; margin-top:8px; }
 
   .tile{
     width:var(--size); height:var(--size);
@@ -57,7 +73,7 @@
   .tile.active .icon path{ fill:var(--ok) }
   .tile.error  .icon path{ fill:var(--err) }
 
-  /* Dwell square fill */
+  /* Dwell square fill from center */
   .fill{
     position:absolute; inset:0;
     margin:auto; width:100%; height:100%;
@@ -67,6 +83,7 @@
     transform-origin: 50% 50%;
     pointer-events:none;
     will-change: transform;
+    z-index:1; /* beneath the gear/menu (which are outside anyway) */
   }
   .fill.filling{
     transition: transform var(--dwell) linear;
@@ -79,7 +96,7 @@
     padding:8px 10px; border-radius:10px;
     font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     max-width:80vw; white-space:pre-wrap; box-shadow:0 6px 20px rgba(0,0,0,.35);
-    z-index:999998;
+    z-index:5;
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -89,17 +106,20 @@
 </head>
 <body>
 
-<!-- ===== ACTION PICKER (always on top) ===== -->
-<div class="toolbar" role="group" aria-label="Choix de l'action">
-  <label for="actionSelect">Action :</label>
-  <!-- Use size="6" to make it a big scrollable list -->
+<!-- Gear + Menu -->
+<button id="settingsIcon" title="Options" aria-haspopup="true" aria-expanded="false">⚙️</button>
+
+<div id="menuPanel" role="dialog" aria-label="Options">
+  <h2>Options</h2>
+  <label for="actionSelect">Action du carré (dwell)</label>
   <select id="actionSelect" aria-label="Choisir l'action">
     <option value="relay">Relais Tuya — impulsion</option>
     <option value="plug">Prise — toy_relay</option>
   </select>
+  <div class="hint">Le carré déclenchera l’action sélectionnée.</div>
 </div>
 
-<!-- ===== Dwell tile ===== -->
+<!-- Dwell tile -->
 <div class="tile" id="tile" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
     <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
@@ -110,17 +130,39 @@
 <pre class="hud" id="hud">ready</pre>
 
 <script>
-  // === CONFIG (use your Cloudflare tunnel for both) ===
+  // Optional: nuke any stale service worker caching this path
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+  }
+
+  // === CONFIG (Cloudflare Tunnel for both actions) ===
   const TUNNEL = "https://haintelligentclassroom.adaptatech.org";
   const URL_RELAY_GO = `${TUNNEL}/api/webhook/tuyarelay`;  // Relais Tuya
   const URL_PLUG_ON  = `${TUNNEL}/api/webhook/toy_relay`;  // Prise
+
+  // UI refs
+  const settingsIcon = document.getElementById('settingsIcon');
+  const menuPanel    = document.getElementById('menuPanel');
+  const select       = document.getElementById('actionSelect');
+  const tile = document.getElementById('tile');
+  const fill = document.getElementById('fill');
+  const hud  = document.getElementById('hud');
+
+  // Toggle menu
+  function toggleMenu(force){
+    const willShow = (typeof force === 'boolean') ? force : !menuPanel.classList.contains('show');
+    menuPanel.classList.toggle('show', willShow);
+    settingsIcon.setAttribute('aria-expanded', willShow ? 'true' : 'false');
+  }
+  settingsIcon.addEventListener('pointerup', (e)=>{ e.stopPropagation(); toggleMenu(); });
+  document.addEventListener('pointerup', (e)=>{
+    if (!menuPanel.contains(e.target) && !settingsIcon.contains(e.target)) toggleMenu(false);
+  });
 
   // Initial selection via ?action=relay|plug or saved value
   const qs = new URLSearchParams(location.search);
   const saved = localStorage.getItem('controller_action');
   const initialAction = (qs.get('action') || saved || 'relay').toLowerCase();
-
-  const select = document.getElementById('actionSelect');
   if ([...select.options].some(o => o.value === initialAction)) {
     select.value = initialAction;
   }
@@ -129,16 +171,12 @@
     log(`action=${select.value}`);
   });
 
-  // Dwell tunables
+  // Dwell tunables (query string)
   const dwellMs     = Math.max(200, parseInt(qs.get('dwell')   || '1500', 10));
   const outsideHold = Math.max(0,   parseInt(qs.get('outside') || '200',  10));
   const graceMs     = Math.max(0,   parseInt(qs.get('grace')   || '200',  10));
   const cooldownMs  = Math.max(0,   parseInt(qs.get('cooldown')|| '600',  10));
   document.documentElement.style.setProperty('--dwell', dwellMs+'ms');
-
-  const tile = document.getElementById('tile');
-  const fill = document.getElementById('fill');
-  const hud  = document.getElementById('hud');
 
   let outsideTimer = null, graceTimer = null, cooldownTimer = null;
   let firing = false, inCooldown = false, dwelling = false;
@@ -210,7 +248,8 @@
     if (dwelling || firing || inCooldown) return;
     dwelling = true;
     startFill();
-    setTimeout(()=>{ stopDwell(); fire(); }, dwellMs);
+    const tm = setTimeout(()=>{ stopDwell(); fire(); }, dwellMs);
+    // watchdog to confirm we stay inside
     (function watchInside(){
       if (!dwelling) return;
       requestAnimationFrame(()=>{
@@ -268,10 +307,8 @@
   // Track pointer
   window.addEventListener('pointermove', (e)=>{ lastPos = {x: e.clientX, y: e.clientY}; }, {passive:true});
 
-  // Page hidden → cancel safely
-  document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
-
-  log(`ready · action=${select.value} · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms`);
+  log(`ready · action=${select.value} · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms
+(Click the ⚙️ to choose which webhook to fire)`);
 </script>
 </body>
 </html>
