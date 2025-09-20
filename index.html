@@ -12,38 +12,46 @@
     --fill: rgba(255,0,0,.65);
     --size: clamp(260px, 50vmin, 520px);
     --dwell: 1500ms; /* JS updates from ?dwell= */
-    --panel:#0f0f10f2;
-    --panel-border:#2a2a2a;
+    --panel:#121212; --panel-border:#2a2a2a;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{
-    display:grid; place-items:center;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px;
     background:var(--bg); color:var(--fg);
     font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     -webkit-tap-highlight-color:transparent;
   }
 
-  /* ===== Fixed top toolbar (always visible) ===== */
-  .toolbar{
-    position:fixed; top:10px; left:50%; transform:translateX(-50%);
-    display:flex; align-items:center; gap:10px;
-    background:var(--panel); border:1px solid var(--panel-border);
-    padding:10px 12px; border-radius:12px;
-    box-shadow:0 10px 30px rgba(0,0,0,.45);
-    z-index:999999;  /* ensure on top */
-    max-width:95vw;
+  /* Always-visible, scrollable picker */
+  .picker{
+    width:min(640px, 92vw);
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:12px;
+    padding:12px;
+    box-shadow:0 12px 30px rgba(0,0,0,.45);
   }
-  .toolbar label{ font-weight:700; color:#ddd; }
-  .toolbar select{
-    min-width:220px;
-    max-width:72vw;
+  .picker h2{
+    margin:0 0 8px; font-size:15px; color:#ddd;
+  }
+  .picker .row{ display:flex; gap:12px; align-items:stretch; }
+  .picker select{
+    flex:1;
+    min-height:160px; /* visible without scrolling */
     background:#151515; color:#fff;
     border:2px solid #2c2c2c; border-radius:10px;
-    padding:10px 12px;
-    font:inherit; outline:none;
+    padding:8px; outline:none;
+    font:14px/1.25 system-ui, Segoe UI, Roboto, Arial;
   }
-  .toolbar .note{ font-size:12px; color:#bbb; }
+  .picker .current{
+    min-width:210px;
+    display:flex; align-items:center; justify-content:center;
+    background:#0b0b0b; border:1px dashed #3a3a3a; border-radius:10px;
+    color:#bbb; padding:8px; text-align:center;
+  }
+  .picker .current b{ color:#fff; }
 
   .tile{
     width:var(--size); height:var(--size);
@@ -61,7 +69,7 @@
   .tile.active .icon path{ fill:var(--ok) }
   .tile.error  .icon path{ fill:var(--err) }
 
-  /* Dwell square fill from center */
+  /* Dwell square fill */
   .fill{
     position:absolute; inset:0;
     margin:auto; width:100%; height:100%;
@@ -75,10 +83,6 @@
   .fill.filling{
     transition: transform var(--dwell) linear;
     transform: scale(1);
-  }
-
-  .status-line{
-    margin-top:10px; text-align:center; color:#ccc; font-size:14px;
   }
 
   .hud{
@@ -96,31 +100,32 @@
 </head>
 <body>
 
-<!-- ===== Action picker (fixed) ===== -->
-<div class="toolbar" role="group" aria-label="Choix de l'action">
-  <label for="actionSelect">Action&nbsp;:</label>
-  <select id="actionSelect" aria-label="Choisir l'action à envoyer">
-    <option value="relay">Relais Tuya — impulsion</option>
-    <option value="plug">Prise — toy_relay</option>
-  </select>
-  <span class="note">La tuile déclenche l’action choisie</span>
+<!-- ===== BIG SCROLLING MENU ===== -->
+<div class="picker" aria-label="Choisir le webhook">
+  <h2>Choisir l’action envoyée par le carré (dwell)</h2>
+  <div class="row">
+    <!-- size=6 keeps it open and scrollable -->
+    <select id="actionSelect" size="6" aria-label="Liste des actions">
+      <option value="relay">Relais Tuya — impulsion</option>
+      <option value="plug">Prise — toy_relay</option>
+      <!-- You can add more later, they’ll show and scroll -->
+    </select>
+    <div class="current">Action actuelle : <b id="currentLabel">Relais Tuya — impulsion</b></div>
+  </div>
 </div>
 
 <!-- ===== Dwell tile ===== -->
-<div>
-  <div class="tile" id="tile" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
-    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
-    </svg>
-    <div class="fill" id="fill"></div>
-  </div>
-  <div class="status-line" id="statusLine">Action actuelle : <strong>Relais Tuya — impulsion</strong></div>
+<div class="tile" id="tile" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
+  </svg>
+  <div class="fill" id="fill"></div>
 </div>
 
 <pre class="hud" id="hud">ready</pre>
 
 <script>
-  // === CONFIG (Cloudflare Tunnel for both actions) ===
+  // === CONFIG (tunnel for both actions) ===
   const TUNNEL = "https://haintelligentclassroom.adaptatech.org";
   const URL_RELAY_GO = `${TUNNEL}/api/webhook/tuyarelay`;  // Relais Tuya
   const URL_PLUG_ON  = `${TUNNEL}/api/webhook/toy_relay`;  // Prise
@@ -131,25 +136,26 @@
   const initialAction = (qs.get('action') || saved || 'relay').toLowerCase();
 
   const select = document.getElementById('actionSelect');
-  const statusLine = document.getElementById('statusLine');
-  if ([...select.options].some(o => o.value === initialAction)) {
-    select.value = initialAction;
-  }
-  updateStatus();
+  const currentLabel = document.getElementById('currentLabel');
 
-  // Persist selection
+  // Ensure initial selection
+  const hasInitial = [...select.options].some(o => o.value === initialAction);
+  if (hasInitial) select.value = initialAction;
+  updateLabel();
+
+  // Persist on change + update label
   select.addEventListener('change', () => {
     localStorage.setItem('controller_action', select.value);
-    updateStatus();
+    updateLabel();
     log(`action=${select.value}`);
   });
 
-  function updateStatus(){
-    const label = select.options[select.selectedIndex]?.text || (select.value === 'plug' ? 'Prise' : 'Relais Tuya');
-    statusLine.innerHTML = `Action actuelle : <strong>${label}</strong>`;
+  function updateLabel(){
+    const txt = select.options[select.selectedIndex]?.text || (select.value === 'plug' ? 'Prise — toy_relay' : 'Relais Tuya — impulsion');
+    currentLabel.textContent = txt;
   }
 
-  // Dwell/cancel tunables
+  // Dwell tunables
   const dwellMs     = Math.max(200, parseInt(qs.get('dwell')   || '1500', 10));
   const outsideHold = Math.max(0,   parseInt(qs.get('outside') || '200',  10));
   const graceMs     = Math.max(0,   parseInt(qs.get('grace')   || '200',  10));
@@ -231,8 +237,8 @@
     dwelling = true;
     startFill();
     const tm = setTimeout(()=>{ stopDwell(); fire(); }, dwellMs);
-    // watchdog to ensure we stay inside
-    (function watchInside(timerId){
+    // watchdog
+    (function watchInside(){
       if (!dwelling) return;
       requestAnimationFrame(()=>{
         const insideByPoint = pointerWithin(tile, lastPos.x, lastPos.y);
@@ -254,9 +260,9 @@
           outsideTimer = clearTO(outsideTimer);
           graceTimer = clearTO(graceTimer);
         }
-        watchInside(timerId);
+        watchInside();
       });
-    })(tm);
+    })();
   }
 
   // Pointer events
@@ -286,14 +292,14 @@
     if (e.code === 'Space' || e.code === 'Enter'){ e.preventDefault(); stopDwell(); fire(); }
   });
 
-  // Track pointer globally for gaze/mouse
+  // Track pointer
   window.addEventListener('pointermove', (e)=>{ lastPos = {x: e.clientX, y: e.clientY}; }, {passive:true});
 
   // Page hidden → cancel safely
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
   log(`ready · action=${select.value} · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms
-(use ?action=relay|plug to set initially; selection is saved)`);
+(selection is saved; use ?action=relay|plug to set initially)`);
 </script>
 </body>
 </html>
