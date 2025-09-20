@@ -11,47 +11,35 @@
     --ok:#1ec97f; --err:#ff6b6b;
     --fill: rgba(255,0,0,.65);
     --size: clamp(260px, 50vmin, 520px);
-    --dwell: 1500ms; /* JS updates from ?dwell= */
-    --panel:#121212; --panel-border:#2a2a2a;
+    --dwell: 1500ms; /* JS updated from ?dwell= */
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:18px;
+    display:grid; place-items:center;
     background:var(--bg); color:var(--fg);
     font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     -webkit-tap-highlight-color:transparent;
   }
 
-  /* Always-visible, scrollable picker */
-  .picker{
-    width:min(640px, 92vw);
-    background:var(--panel);
-    border:1px solid var(--panel-border);
-    border-radius:12px;
-    padding:12px;
-    box-shadow:0 12px 30px rgba(0,0,0,.45);
+  /* ===== SUPER-VISIBLE PICKER (fixed, white, huge z-index) ===== */
+  .toolbar{
+    position:fixed; top:12px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:12px;
+    background:#fff; color:#000; border:2px solid #ff2a8a;
+    border-radius:12px; padding:10px 14px;
+    box-shadow:0 16px 40px rgba(0,0,0,.5);
+    z-index:999999; pointer-events:auto;
+    max-width:95vw;
   }
-  .picker h2{
-    margin:0 0 8px; font-size:15px; color:#ddd;
+  .toolbar label{ font-weight:700; color:#111; }
+  .toolbar select{
+    min-width:260px; max-width:70vw;
+    background:#fff; color:#000; user-select:auto;
+    border:2px solid #222; border-radius:10px; padding:10px 12px; outline:none;
   }
-  .picker .row{ display:flex; gap:12px; align-items:stretch; }
-  .picker select{
-    flex:1;
-    min-height:160px; /* visible without scrolling */
-    background:#151515; color:#fff;
-    border:2px solid #2c2c2c; border-radius:10px;
-    padding:8px; outline:none;
-    font:14px/1.25 system-ui, Segoe UI, Roboto, Arial;
-  }
-  .picker .current{
-    min-width:210px;
-    display:flex; align-items:center; justify-content:center;
-    background:#0b0b0b; border:1px dashed #3a3a3a; border-radius:10px;
-    color:#bbb; padding:8px; text-align:center;
-  }
-  .picker .current b{ color:#fff; }
+  /* Optional: make it a permanently open, scrollable list */
+  /* .toolbar select { height:160px; }  */
 
   .tile{
     width:var(--size); height:var(--size);
@@ -91,6 +79,7 @@
     padding:8px 10px; border-radius:10px;
     font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     max-width:80vw; white-space:pre-wrap; box-shadow:0 6px 20px rgba(0,0,0,.35);
+    z-index:999998;
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -100,18 +89,14 @@
 </head>
 <body>
 
-<!-- ===== BIG SCROLLING MENU ===== -->
-<div class="picker" aria-label="Choisir le webhook">
-  <h2>Choisir l’action envoyée par le carré (dwell)</h2>
-  <div class="row">
-    <!-- size=6 keeps it open and scrollable -->
-    <select id="actionSelect" size="6" aria-label="Liste des actions">
-      <option value="relay">Relais Tuya — impulsion</option>
-      <option value="plug">Prise — toy_relay</option>
-      <!-- You can add more later, they’ll show and scroll -->
-    </select>
-    <div class="current">Action actuelle : <b id="currentLabel">Relais Tuya — impulsion</b></div>
-  </div>
+<!-- ===== ACTION PICKER (always on top) ===== -->
+<div class="toolbar" role="group" aria-label="Choix de l'action">
+  <label for="actionSelect">Action :</label>
+  <!-- Use size="6" to make it a big scrollable list -->
+  <select id="actionSelect" aria-label="Choisir l'action">
+    <option value="relay">Relais Tuya — impulsion</option>
+    <option value="plug">Prise — toy_relay</option>
+  </select>
 </div>
 
 <!-- ===== Dwell tile ===== -->
@@ -125,35 +110,24 @@
 <pre class="hud" id="hud">ready</pre>
 
 <script>
-  // === CONFIG (tunnel for both actions) ===
+  // === CONFIG (use your Cloudflare tunnel for both) ===
   const TUNNEL = "https://haintelligentclassroom.adaptatech.org";
   const URL_RELAY_GO = `${TUNNEL}/api/webhook/tuyarelay`;  // Relais Tuya
   const URL_PLUG_ON  = `${TUNNEL}/api/webhook/toy_relay`;  // Prise
 
-  // Initial selection via ?action=relay|plug, else from localStorage, default 'relay'
+  // Initial selection via ?action=relay|plug or saved value
   const qs = new URLSearchParams(location.search);
   const saved = localStorage.getItem('controller_action');
   const initialAction = (qs.get('action') || saved || 'relay').toLowerCase();
 
   const select = document.getElementById('actionSelect');
-  const currentLabel = document.getElementById('currentLabel');
-
-  // Ensure initial selection
-  const hasInitial = [...select.options].some(o => o.value === initialAction);
-  if (hasInitial) select.value = initialAction;
-  updateLabel();
-
-  // Persist on change + update label
+  if ([...select.options].some(o => o.value === initialAction)) {
+    select.value = initialAction;
+  }
   select.addEventListener('change', () => {
     localStorage.setItem('controller_action', select.value);
-    updateLabel();
     log(`action=${select.value}`);
   });
-
-  function updateLabel(){
-    const txt = select.options[select.selectedIndex]?.text || (select.value === 'plug' ? 'Prise — toy_relay' : 'Relais Tuya — impulsion');
-    currentLabel.textContent = txt;
-  }
 
   // Dwell tunables
   const dwellMs     = Math.max(200, parseInt(qs.get('dwell')   || '1500', 10));
@@ -236,8 +210,7 @@
     if (dwelling || firing || inCooldown) return;
     dwelling = true;
     startFill();
-    const tm = setTimeout(()=>{ stopDwell(); fire(); }, dwellMs);
-    // watchdog
+    setTimeout(()=>{ stopDwell(); fire(); }, dwellMs);
     (function watchInside(){
       if (!dwelling) return;
       requestAnimationFrame(()=>{
@@ -298,8 +271,7 @@
   // Page hidden → cancel safely
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
-  log(`ready · action=${select.value} · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms
-(selection is saved; use ?action=relay|plug to set initially)`);
+  log(`ready · action=${select.value} · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms`);
 </script>
 </body>
 </html>
