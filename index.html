@@ -79,11 +79,19 @@
 <pre class="hud" id="hud">ready</pre>
 
 <script>
-  // === CONFIG ===
-  const HA_URL = "https://haintelligentclassroom.adaptatech.org";
-  const WEBHOOK_ID = "toy_relay";
+  // === CONFIG (Cloudflare Tunnel for both actions) ===
+  const TUNNEL = "https://haintelligentclassroom.adaptatech.org";
+  // Relay Tuya (ex: impulsion)
+  const URL_RELAY_GO = `${TUNNEL}/api/webhook/tuyarelay`;
+  // Prise (ex: toy_relay / plug)
+  const URL_PLUG_ON  = `${TUNNEL}/api/webhook/toy_relay`;
 
+  // Choose which action to trigger via query string:
+  // ?action=relay  (par défaut)  ou  ?action=plug
   const qs = new URLSearchParams(location.search);
+  const action = (qs.get('action') || 'relay').toLowerCase();
+
+  // Dwell/cancel tunables
   const dwellMs     = Math.max(200, parseInt(qs.get('dwell')   || '1500', 10));
   const outsideHold = Math.max(0,   parseInt(qs.get('outside') || '200',  10)); // must be outside this long before we consider cancel
   const graceMs     = Math.max(0,   parseInt(qs.get('grace')   || '200',  10)); // extra grace before cancel after outsideHold
@@ -130,13 +138,19 @@
     if (firing || inCooldown) return;
     firing = true; inCooldown = true;
     tile.classList.remove('error'); tile.classList.add('active');
-    log('POST →', `${HA_URL}/api/webhook/${WEBHOOK_ID}`);
+
+    // Pick the URL based on current action
+    const url = (action === 'plug') ? URL_PLUG_ON : URL_RELAY_GO;
+    log('POST →', url);
 
     try{
       const controller = new AbortController();
       const to = setTimeout(()=>controller.abort('timeout'), 8000);
-      const res = await fetch(`${HA_URL}/api/webhook/${WEBHOOK_ID}?t=${Date.now()}`, {
-        method:'POST', cache:'no-store', credentials:'omit', redirect:'follow', signal: controller.signal
+      const res = await fetch(url + `?t=${Date.now()}`, {
+        method:'POST',
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({ from:"github-page", action }),
+        cache:'no-store', credentials:'omit', redirect:'follow', signal: controller.signal
       });
       clearTimeout(to);
       log(`status ${res.status}`);
@@ -247,7 +261,7 @@
   // Page hidden → cancel safely
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
-  log(`ready · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms
+  log(`ready · action=${action} · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms
 (For mouse testing: try ?outside=250&grace=250 for max stickiness)`);
 </script>
 </body>
