@@ -12,6 +12,8 @@
     --fill: rgba(255,0,0,.65);
     --size: clamp(260px, 50vmin, 520px);
     --dwell: 1500ms; /* JS updates from ?dwell= */
+    --panel:#0b0b0bcc;
+    --accent:#25c2a0;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -20,6 +22,35 @@
     background:var(--bg); color:var(--fg);
     font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     user-select:none; -webkit-tap-highlight-color:transparent;
+  }
+
+  .wrap{
+    display:grid; gap:16px; place-items:center;
+    width:min(1000px, 96vw); margin:auto; padding:12px;
+  }
+
+  /* Control panel (select menu) */
+  .panel{
+    display:flex; align-items:center; gap:10px;
+    background:var(--panel);
+    padding:10px 12px; border-radius:12px;
+    backdrop-filter: blur(6px);
+    box-shadow:0 6px 22px rgba(0,0,0,.35);
+    width:min(640px, 95vw);
+  }
+  .panel label{ font-weight:700; color:#ddd; }
+  .panel select{
+    flex:1;
+    appearance:none;
+    background:#151515; color:#fff;
+    border:2px solid #2c2c2c; border-radius:10px;
+    padding:10px 12px;
+    font:inherit;
+    outline:none;
+    max-height:40vh; /* dropdown will scroll when large */
+  }
+  .hint{
+    font-size:12px; color:#bbb;
   }
 
   .tile{
@@ -46,7 +77,7 @@
     border-radius:inherit;
     transform: scale(0);
     transform-origin: 50% 50%;
-    pointer-events:none;   /* important: overlay never steals hover/hit-test */
+    pointer-events:none;   /* overlay never steals hover/hit-test */
     will-change: transform;
   }
   .fill.filling{
@@ -59,7 +90,7 @@
     background:rgba(0,0,0,.55); color:#fff;
     padding:8px 10px; border-radius:10px;
     font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    max-width:80vw; white-space:pre; box-shadow:0 6px 20px rgba(0,0,0,.35);
+    max-width:80vw; white-space:pre-wrap; box-shadow:0 6px 20px rgba(0,0,0,.35);
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -69,11 +100,24 @@
 </head>
 <body>
 
-<div class="tile" id="tile" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
-  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
-  </svg>
-  <div class="fill" id="fill"></div>
+<div class="wrap">
+  <!-- Scrolling dropdown menu to choose the target webhook -->
+  <div class="panel" role="group" aria-label="Choix de l'action">
+    <label for="actionSelect">Action&nbsp;:</label>
+    <select id="actionSelect" aria-label="Choisir l'action à envoyer">
+      <option value="relay">Relais Tuya — impulsion</option>
+      <option value="plug">Prise — toy_relay</option>
+    </select>
+  </div>
+  <div class="hint">Regardez/maintenez sur le carré pour déclencher l’action choisie.</div>
+
+  <!-- Dwell tile -->
+  <div class="tile" id="tile" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
+    </svg>
+    <div class="fill" id="fill"></div>
+  </div>
 </div>
 
 <pre class="hud" id="hud">ready</pre>
@@ -81,21 +125,32 @@
 <script>
   // === CONFIG (Cloudflare Tunnel for both actions) ===
   const TUNNEL = "https://haintelligentclassroom.adaptatech.org";
-  // Relay Tuya (ex: impulsion)
+  // Relay Tuya (impulsion)
   const URL_RELAY_GO = `${TUNNEL}/api/webhook/tuyarelay`;
-  // Prise (ex: toy_relay / plug)
+  // Prise (toy_relay)
   const URL_PLUG_ON  = `${TUNNEL}/api/webhook/toy_relay`;
 
-  // Choose which action to trigger via query string:
-  // ?action=relay  (par défaut)  ou  ?action=plug
+  // Initial selection via ?action=relay|plug, else from localStorage, default 'relay'
   const qs = new URLSearchParams(location.search);
-  const action = (qs.get('action') || 'relay').toLowerCase();
+  const saved = localStorage.getItem('controller_action');
+  const initialAction = (qs.get('action') || saved || 'relay').toLowerCase();
 
-  // Dwell/cancel tunables
+  const select = document.getElementById('actionSelect');
+  if ([...select.options].some(o => o.value === initialAction)) {
+    select.value = initialAction;
+  }
+
+  // Persist selection
+  select.addEventListener('change', () => {
+    localStorage.setItem('controller_action', select.value);
+    log(`action=${select.value}`);
+  });
+
+  // Dwell/cancel tunables (still via query string)
   const dwellMs     = Math.max(200, parseInt(qs.get('dwell')   || '1500', 10));
-  const outsideHold = Math.max(0,   parseInt(qs.get('outside') || '200',  10)); // must be outside this long before we consider cancel
-  const graceMs     = Math.max(0,   parseInt(qs.get('grace')   || '200',  10)); // extra grace before cancel after outsideHold
-  const cooldownMs  = Math.max(0,   parseInt(qs.get('cooldown')|| '600',  10)); // after fire
+  const outsideHold = Math.max(0,   parseInt(qs.get('outside') || '200',  10));
+  const graceMs     = Math.max(0,   parseInt(qs.get('grace')   || '200',  10));
+  const cooldownMs  = Math.max(0,   parseInt(qs.get('cooldown')|| '600',  10));
   document.documentElement.style.setProperty('--dwell', dwellMs+'ms');
 
   const tile = document.getElementById('tile');
@@ -106,7 +161,6 @@
   let outsideTimer = null;   // starts after a leave; only cancels *after* outsideHold
   let graceTimer = null;     // small buffer after outsideHold before we actually cancel
   let cooldownTimer = null;
-  let rAF = null;
 
   let firing = false;
   let inCooldown = false;
@@ -121,7 +175,7 @@
   }
   function cancelFill(){ fill.classList.remove('filling'); }
 
-  function clear(id){ if (id) clearTimeout(id); return null; }
+  function clearTO(id){ if (id) clearTimeout(id); return null; }
 
   function elContainsPoint(el, x, y){
     const at = document.elementFromPoint(x, y);
@@ -134,14 +188,18 @@
     return elContainsPoint(el, x, y);
   }
 
+  function currentUrl(){
+    return (select.value === 'plug') ? URL_PLUG_ON : URL_RELAY_GO;
+  }
+
   async function fire(){
     if (firing || inCooldown) return;
     firing = true; inCooldown = true;
     tile.classList.remove('error'); tile.classList.add('active');
 
-    // Pick the URL based on current action
-    const url = (action === 'plug') ? URL_PLUG_ON : URL_RELAY_GO;
-    log('POST →', url);
+    const action = select.value;
+    const url = currentUrl();
+    log('POST →', url, '· action=', action);
 
     try{
       const controller = new AbortController();
@@ -162,16 +220,16 @@
     }finally{
       setTimeout(()=> tile.classList.remove('active'), 450);
       firing = false;
-      cooldownTimer = clear(cooldownTimer);
+      cooldownTimer = clearTO(cooldownTimer);
       cooldownTimer = setTimeout(()=>{ inCooldown = false; }, cooldownMs);
     }
   }
 
   function stopDwell(){
     dwelling = false;
-    dwellTimer = clear(dwellTimer);
-    outsideTimer = clear(outsideTimer);
-    graceTimer = clear(graceTimer);
+    dwellTimer = clearTO(dwellTimer);
+    outsideTimer = clearTO(outsideTimer);
+    graceTimer = clearTO(graceTimer);
     cancelFill();
   }
 
@@ -180,27 +238,22 @@
     dwelling = true;
     startFill();
     dwellTimer = setTimeout(()=>{ stopDwell(); fire(); }, dwellMs);
-    // Lightweight watchdog: validate we stay inside while timer runs.
     watchInside();
   }
 
   function watchInside(){
     if (!dwelling) return;
-    rAF = requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
       const insideByPoint = pointerWithin(tile, lastPos.x, lastPos.y);
-      // For mouse, :hover is a reliable additional signal
       const insideHover = tile.matches(':hover');
       if (!insideByPoint && !insideHover){
-        // don't cancel immediately; start outside hold timing if not already started
         if (!outsideTimer){
           outsideTimer = setTimeout(()=>{
-            // After being outside for outsideHold, give a small grace window to allow fast re-entry
-            graceTimer = clear(graceTimer);
+            graceTimer = clearTO(graceTimer);
             if (graceMs <= 0){
               stopDwell();
             }else{
               graceTimer = setTimeout(()=>{
-                // Before final cancel, double-check again
                 const stillOut = !pointerWithin(tile, lastPos.x, lastPos.y) && !tile.matches(':hover');
                 if (stillOut) stopDwell();
               }, graceMs);
@@ -208,9 +261,8 @@
           }, outsideHold);
         }
       }else{
-        // we're inside; clear any pending outside/grace cancels
-        outsideTimer = clear(outsideTimer);
-        graceTimer = clear(graceTimer);
+        outsideTimer = clearTO(outsideTimer);
+        graceTimer = clearTO(graceTimer);
       }
       watchInside();
     });
@@ -219,37 +271,32 @@
   // ===== Pointer events =====
   tile.addEventListener('pointerenter', (e)=>{
     lastPos = {x: e.clientX, y: e.clientY};
-    outsideTimer = clear(outsideTimer);
-    graceTimer = clear(graceTimer);
+    outsideTimer = clearTO(outsideTimer);
+    graceTimer = clearTO(graceTimer);
     beginDwell();
   });
 
   tile.addEventListener('pointermove', (e)=>{
-    lastPos = {x: e.clientX, y: e.clientY}; // always update—no jitter gate
+    lastPos = {x: e.clientX, y: e.clientY};
   });
 
-  // Do NOT immediately cancel on leave; just arm outsideTimer.
   tile.addEventListener('pointerleave', (e)=>{
     lastPos = {x: e.clientX, y: e.clientY};
-    // If elementFromPoint says we're still effectively on the tile (e.g., border/SVG), ignore
     if (elContainsPoint(tile, lastPos.x, lastPos.y)) return;
-    // Outside timing handled by watchdog; nothing to do here.
+    // watchdog handles timing
   });
 
-  // Some drivers send only down/up. Treat press as a strong “enter”.
   tile.addEventListener('pointerdown', (e)=>{
     lastPos = {x: e.clientX, y: e.clientY};
-    outsideTimer = clear(outsideTimer);
-    graceTimer = clear(graceTimer);
+    outsideTimer = clearTO(outsideTimer);
+    graceTimer = clearTO(graceTimer);
     beginDwell();
   });
   tile.addEventListener('pointerup', (e)=>{
     lastPos = {x: e.clientX, y: e.clientY};
-    // Let watchdog decide if we left
   });
   tile.addEventListener('pointercancel', (e)=>{
     lastPos = {x: e.clientX, y: e.clientY};
-    // Let watchdog decide
   });
 
   // Explicit trigger (click / keyboard)
@@ -261,8 +308,8 @@
   // Page hidden → cancel safely
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
-  log(`ready · action=${action} · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms
-(For mouse testing: try ?outside=250&grace=250 for max stickiness)`);
+  log(`ready · action=${select.value} · dwell=${dwellMs}ms · outsideHold=${outsideHold}ms · grace=${graceMs}ms · cooldown=${cooldownMs}ms
+(use ?action=relay|plug to set initially; selection is saved)`);
 </script>
 </body>
 </html>
