@@ -12,132 +12,42 @@
     --ok:#1ec97f; --err:#ff6b6b;
     --fill: rgba(255,0,0,.65);
     --size: clamp(260px, 50vmin, 520px);
-    --dwell: 1500ms; /* JS can override via ?dwell= */
+    --dwell: 1500ms;
     --panel-bg:#ffffff; --panel-fg:#000;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
-  body{
-    display:grid; place-items:center;
-    background:var(--bg); color:var(--fg);
-    font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    -webkit-tap-highlight-color:transparent;
-  }
-
-  /* ===== Gear button (top-right) ===== */
-  #settingsIcon{
-    position:fixed; top:14px; right:14px;
-    width:44px; height:44px; border-radius:50%;
-    background:var(--panel-bg); color:var(--panel-fg);
-    border:2px solid #ff2a8a;
-    display:flex; align-items:center; justify-content:center;
-    font-size:22px; line-height:1;
-    cursor:pointer; z-index:10010;
-    box-shadow:0 10px 30px rgba(0,0,0,.6);
-  }
+  body{display:grid; place-items:center; background:var(--bg); color:var(--fg); font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; -webkit-tap-highlight-color:transparent;}
+  #settingsIcon{position:fixed; top:14px; right:14px; width:44px; height:44px; border-radius:50%; background:var(--panel-bg); color:var(--panel-fg); border:2px solid #ff2a8a; display:flex; align-items:center; justify-content:center; font-size:22px; line-height:1; cursor:pointer; z-index:10010; box-shadow:0 10px 30px rgba(0,0,0,.6);}
   #settingsIcon:active{ transform:scale(.98); }
-
-  /* ===== Options panel ===== */
-  #menuPanel{
-    position:fixed; top:70px; right:14px;
-    width:min(420px, 94vw);
-    background:var(--panel-bg); color:var(--panel-fg);
-    border:2px solid #111; border-radius:12px;
-    box-shadow:0 20px 50px rgba(0,0,0,.55);
-    padding:14px; z-index:10011;
-    display:none;
-  }
+  #menuPanel{position:fixed; top:70px; right:14px; width:min(420px, 94vw); background:var(--panel-bg); color:var(--panel-fg); border:2px solid #111; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,.55); padding:14px; z-index:10011; display:none;}
   #menuPanel.show{ display:block; }
   #menuPanel h2{ margin:0 0 10px; font-size:18px; }
   #menuPanel h3{ margin:12px 0 6px; font-size:15px; }
   #menuPanel .radio{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
   #menuPanel label{ font-weight:600; }
-  #menuPanel select{
-    width:100%;
-    background:#fff; color:#000;
-    border:2px solid #222; border-radius:10px;
-    padding:10px 12px; outline:none; font:inherit;
-  }
-
-  /* ===== Center wraps ===== */
-  .center{
-    display:grid; place-items:center;
-    gap:18px;
-  }
-
-  /* ===== Dwell tile ===== */
-  .tile{
-    width:var(--size); height:var(--size);
-    display:grid; place-items:center;
-    background:var(--tile);
-    border:2px solid var(--tile-border);
-    border-radius:24px;
-    position:relative; overflow:hidden;
-    box-shadow:0 10px 30px rgba(0,0,0,.5);
-    touch-action:none;
-  }
+  #menuPanel select{ width:100%; background:#fff; color:#000; border:2px solid #222; border-radius:10px; padding:10px 12px; outline:none; font:inherit; }
+  .center{ display:grid; place-items:center; gap:18px; }
+  .tile{ width:var(--size); height:var(--size); display:grid; place-items:center; background:var(--tile); border:2px solid var(--tile-border); border-radius:24px; position:relative; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.5); touch-action:none; }
   .icon{ width:40%; max-width:220px; aspect-ratio:1/1; display:block }
   .icon path{ fill:#ddd; transition:fill .2s ease }
   .active .icon path{ fill:var(--ok) }
   .error  .icon path{ fill:var(--err) }
-
-  /* ===== Fill/progress overlay (re-used on tiles & buttons) ===== */
-  .fill{
-    position:absolute; inset:0;
-    margin:auto; width:100%; height:100%;
-    background:var(--fill);
-    border-radius:inherit;
-    transform: scale(0);
-    transform-origin: 50% 50%;
-    pointer-events:none;
-    will-change: transform;
-    z-index:1;
-  }
+  .fill{ position:absolute; inset:0; margin:auto; width:100%; height:100%; background:var(--fill); border-radius:inherit; transform: scale(0); transform-origin: 50% 50%; pointer-events:none; will-change: transform; z-index:1; }
   .fill.filling{ transition: transform var(--dwell) linear; transform: scale(1); }
-
-  /* ===== Multi-buttons ===== */
-  .grid{
-    display:grid;
-    grid-template-columns: repeat(2, minmax(180px, 1fr));
-    gap:18px;
-    width:min(920px, 94vw);
-  }
+  .grid{ display:grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap:18px; width:min(920px, 94vw); }
   .grid.four{ grid-template-columns: repeat(4, minmax(140px, 1fr)); }
-  .btnCard{
-    background:#101010; border:2px solid #2b2b2b; border-radius:16px;
-    box-shadow:0 8px 24px rgba(0,0,0,.35);
-    overflow:hidden; cursor:pointer; position:relative;
-    display:flex; flex-direction:column; align-items:center; justify-content:stretch;
-    width:100%; min-height:180px;
-    touch-action:none;
-  }
+  .btnCard{ background:#101010; border:2px solid #2b2b2b; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,.35); overflow:hidden; cursor:pointer; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:stretch; width:100%; min-height:180px; touch-action:none; }
   .btnCard.active{ outline:3px solid var(--ok); outline-offset:-3px; }
   .btnCard.error { outline:3px solid var(--err); outline-offset:-3px; }
-  .pic{
-    width:100%; aspect-ratio:16/10; display:block; background:#181818; object-fit:cover;
-  }
-  .label{
-    width:100%; padding:10px 12px; text-align:center; color:#ddd; font-weight:700;
-    border-top:1px solid #2b2b2b;
-  }
-
-  .hud{
-    position:fixed; left:12px; bottom:12px;
-    background:rgba(0,0,0,.55); color:#fff;
-    padding:8px 10px; border-radius:10px;
-    font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    max-width:80vw; white-space:pre-wrap; box-shadow:0 6px 20px rgba(0,0,0,.35);
-    z-index:5;
-  }
-
-  @media (prefers-reduced-motion: reduce){
-    .fill.filling{ transition-duration: 1ms; }
-  }
+  .pic{ width:100%; aspect-ratio:16/10; display:block; background:#181818; object-fit:cover; }
+  .label{ width:100%; padding:10px 12px; text-align:center; color:#ddd; font-weight:700; border-top:1px solid #2b2b2b; }
+  .hud{ position:fixed; left:12px; bottom:12px; background:rgba(0,0,0,.55); color:#fff; padding:8px 10px; border-radius:10px; font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-width:80vw; white-space:pre-wrap; box-shadow:0 6px 20px rgba(0,0,0,.35); z-index:5; }
+  @media (prefers-reduced-motion: reduce){ .fill.filling{ transition-duration: 1ms; } }
 </style>
 </head>
 <body>
 
-<!-- Gear + Menu -->
 <button id="settingsIcon" title="Options" aria-haspopup="true" aria-expanded="false">⚙️</button>
 
 <div id="menuPanel" role="dialog" aria-label="Options">
@@ -166,9 +76,7 @@
   </select>
 </div>
 
-<!-- ===== CENTER CONTENT ===== -->
 <div class="center">
-  <!-- Dwell tile -->
   <div id="dwellWrap" class="tile dwellable" data-action="plug1" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
@@ -176,7 +84,6 @@
     <div class="fill"></div>
   </div>
 
-  <!-- 2 buttons (plug1 + tuyarelay1) -->
   <div id="buttons2Wrap" class="grid" style="display:none" aria-label="Panneau 2 boutons">
     <button class="btnCard dwellable" data-action="plug1" aria-label="Prise 1 — plug1">
       <img class="pic" alt="plug1" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>plug1</text></svg>">
@@ -190,7 +97,6 @@
     </button>
   </div>
 
-  <!-- 4 buttons (plug1, plug2, tuyarelay1, tuyarelay2) -->
   <div id="buttons4Wrap" class="grid four" style="display:none" aria-label="Panneau 4 boutons">
     <button class="btnCard dwellable" data-action="plug1" aria-label="Prise 1 — plug1">
       <img class="pic" alt="plug1" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>plug1</text></svg>">
@@ -218,32 +124,34 @@
 <pre class="hud" id="hud">ready</pre>
 
 <script>
-  // Optional: unregister any SW so updates show
+  // Optional: unregister SW so updates show
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
   }
 
-  // ===== Fixed webhook URLs via your Cloudflare Tunnel =====
-  const TUNNEL = "https://haintelligentclassroom.adaptatech.org";
+  // ===== Params & base URLs (tunnel vs local) =====
+  const qs = new URLSearchParams(location.search);
+  const USE_LOCAL = qs.get('local') === '1';
+  const LOCAL_BASE  = "http://192.168.68.134:8123";
+  const TUNNEL_BASE = "https://haintelligentclassroom.adaptatech.org";
+  const BASE = USE_LOCAL ? LOCAL_BASE : TUNNEL_BASE;
+
   const URLS = {
-    plug1:       `${TUNNEL}/api/webhook/plug1`,
-    plug2:       `${TUNNEL}/api/webhook/plug2`,
-    tuyarelay1:  `${TUNNEL}/api/webhook/tuyarelay1`,
-    tuyarelay2:  `${TUNNEL}/api/webhook/tuyarelay2`,
+    plug1:       `${BASE}/api/webhook/plug1`,
+    plug2:       `${BASE}/api/webhook/plug2`,
+    tuyarelay1:  `${BASE}/api/webhook/tuyarelay1`,
+    tuyarelay2:  `${BASE}/api/webhook/tuyarelay2`,
   };
 
   // ===== UI refs =====
   const settingsIcon = document.getElementById('settingsIcon');
   const menuPanel = document.getElementById('menuPanel');
   const actionSelect = document.getElementById('actionSelect');
-
   const dwellWrap    = document.getElementById('dwellWrap');
   const buttons2Wrap = document.getElementById('buttons2Wrap');
   const buttons4Wrap = document.getElementById('buttons4Wrap');
-
   const hud = document.getElementById('hud');
 
-  // ===== Toggle menu =====
   function toggleMenu(force){
     const willShow = (typeof force === 'boolean') ? force : !menuPanel.classList.contains('show');
     menuPanel.classList.toggle('show', willShow);
@@ -254,13 +162,11 @@
     if (!menuPanel.contains(e.target) && !settingsIcon.contains(e.target)) toggleMenu(false);
   });
 
-  // ===== LocalStorage helpers =====
   const LS = {
     get(k, def){ try{ const v = localStorage.getItem(k); return v ?? def; }catch{return def;} },
     set(k, v){ try{ localStorage.setItem(k, v); }catch{} }
   };
 
-  // ===== Mode handling =====
   const modeRadios = () => [...document.querySelectorAll('input[name="mode"]')];
   function setMode(mode){
     LS.set('ui_mode', mode);
@@ -272,16 +178,15 @@
   }
   modeRadios().forEach(r => r.addEventListener('change', () => setMode(r.value)));
 
-  // ===== Initial selection =====
-  const qs = new URLSearchParams(location.search);
+  // Initial selection
   const initialAction = (qs.get('action') || LS.get('dwell_action', 'plug1')).toLowerCase();
   const initialMode   = (qs.get('mode') || LS.get('ui_mode', 'dwell')).toLowerCase();
 
-  // --- test params for tuyarelay2 only (duration still via URL) ---
+  // tuyarelay2 fire mode & duration (duration still via ?ms=)
   const qsFireMode   = (qs.get('firemode') || '').toLowerCase();
   const savedFire    = (LS.get('tuyarelay2_firemode', 'momentary') || 'momentary').toLowerCase();
   let fireMode = (qsFireMode === 'momentary' || qsFireMode === 'toggle') ? qsFireMode : savedFire;
-  const testMs   = Math.max(100, parseInt(qs.get('ms') || '1500', 10));   // duration for momentary
+  const testMs = Math.max(100, parseInt(qs.get('ms') || '1500', 10));
 
   actionSelect.value = ['plug1','plug2','tuyarelay1','tuyarelay2'].includes(initialAction) ? initialAction : 'plug1';
   actionSelect.addEventListener('change', () => {
@@ -294,11 +199,9 @@
   setMode(['dwell','buttons2','buttons4'].includes(initialMode) ? initialMode : 'dwell');
   document.querySelector(`input[name="mode"][value="${initialMode}"]`)?.setAttribute('checked','checked');
 
-  // ===== NEW: Wire the fire mode radios for tuyarelay2 =====
+  // Wire the fire mode radios for tuyarelay2
   const fireRadios = () => [...document.querySelectorAll('input[name="fireMode2"]')];
-  function setFireModeUI(modeStr){
-    fireRadios().forEach(r => r.checked = (r.value === modeStr));
-  }
+  function setFireModeUI(modeStr){ fireRadios().forEach(r => r.checked = (r.value === modeStr)); }
   setFireModeUI(fireMode);
   fireRadios().forEach(r => r.addEventListener('change', () => {
     fireMode = r.value; // 'momentary' | 'toggle'
@@ -306,75 +209,54 @@
     log('tuyarelay2 firemode =', fireMode);
   }));
 
-  // ===== Dwell/cancel tunables =====
+  // Dwell tunables
   const dwellMs     = Math.max(200, parseInt(qs.get('dwell')   || '1500', 10));
   const outsideHold = Math.max(0,   parseInt(qs.get('outside') || '200',  10));
   const graceMs     = Math.max(0,   parseInt(qs.get('grace')   || '200',  10));
   const cooldownMs  = Math.max(0,   parseInt(qs.get('cooldown')|| '600',  10));
   document.documentElement.style.setProperty('--dwell', dwellMs+'ms');
 
-  // ===== Shared dwell engine (eyegaze-friendly) =====
-  let dwellTarget = null, dwellAction = null;
-  let dwellTimer = null, outsideTimer = null, graceTimer = null, cooldownTimer = null;
+  let dwellTarget = null, dwellTimer = null, outsideTimer = null, graceTimer = null, cooldownTimer = null;
   let firing = false, inCooldown = false, dwelling = false;
   let lastPos = { x: 0, y: 0 };
 
   function log(...a){ console.log(...a); hud.textContent = a.map(String).join(' '); }
-
-  function ensureFill(el){
-    let f = el.querySelector('.fill');
-    if (!f){ f = document.createElement('div'); f.className='fill'; el.appendChild(f); }
-    return f;
-  }
-  function startFill(el){
-    const f = ensureFill(el);
-    f.classList.remove('filling'); void f.offsetWidth; f.classList.add('filling');
-  }
-  function cancelFill(el){
-    const f = el.querySelector('.fill');
-    if (f) f.classList.remove('filling');
-  }
+  function ensureFill(el){ let f = el.querySelector('.fill'); if (!f){ f = document.createElement('div'); f.className='fill'; el.appendChild(f); } return f; }
+  function startFill(el){ const f = ensureFill(el); f.classList.remove('filling'); void f.offsetWidth; f.classList.add('filling'); }
+  function cancelFill(el){ const f = el.querySelector('.fill'); if (f) f.classList.remove('filling'); }
   function clearTO(id){ if (id) clearTimeout(id); return null; }
-
-  function elContainsPoint(el, x, y){
-    const at = document.elementFromPoint(x, y);
-    return !!(at && (at === el || el.contains(at)));
-  }
-  function pointerWithin(el, x, y){
-    const r = el.getBoundingClientRect();
-    if (x < r.left || x > r.right || y < r.top || y > r.bottom) return false;
-    return elContainsPoint(el, x, y);
-  }
+  function elContainsPoint(el, x, y){ const at = document.elementFromPoint(x, y); return !!(at && (at === el || el.contains(at))); }
+  function pointerWithin(el, x, y){ const r = el.getBoundingClientRect(); if (x < r.left || x > r.right || y < r.top || y > r.bottom) return false; return elContainsPoint(el, x, y); }
 
   function urlFor(action){ return URLS[action] || URLS.plug1; }
 
-  // ===== ONLY tuyarelay2 reads fireMode & testMs and sends JSON to HA
+  // Send SIMPLE requests: tuyarelay2 uses query params (no JSON body, no custom headers)
   async function fireUrl(targetEl, action){
     if (firing || inCooldown) return;
     firing = true; inCooldown = true;
     targetEl.classList.remove('error'); targetEl.classList.add('active');
 
-    const url = urlFor(action);
-    log('POST →', url, '· action=', action);
-
-    const body = { from:"github-page", action };
+    const base = urlFor(action);
+    let full = base + `?t=${Date.now()}`;
     if (action === 'tuyarelay2') {
-      body.mode = fireMode;          // 'momentary' or 'toggle'
-      body.duration_ms = testMs;     // still from URL for now
+      const p = new URLSearchParams({ mode: fireMode, duration_ms: String(testMs) });
+      full = `${base}?${p.toString()}&t=${Date.now()}`;
     }
+
+    log('POST →', full, '· action=', action);
 
     try{
       const controller = new AbortController();
       const to = setTimeout(()=>controller.abort('timeout'), 8000);
-      const res = await fetch(url + `?t=${Date.now()}`, {
-        method:'POST',
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify(body),
-        cache:'no-store', credentials:'omit', redirect:'follow', signal: controller.signal
+
+      // No headers, no body => CORS preflight avoided, works from HTTPS pages too (if endpoint is HTTPS).
+      const res = await fetch(full, {
+        method:'POST', cache:'no-store', redirect:'follow', signal: controller.signal
       });
+
       clearTimeout(to);
-      log(`status ${res.status}`);
-      if (!res.ok) throw new Error('HTTP '+res.status);
+      log(`status ${res.status || '(opaque)'}`);
+      // res.ok is fine if same-origin/HTTPS; if cross-origin opaque, we won't see status, but HA still receives it.
     }catch(err){
       targetEl.classList.add('error');
       log('error:', (err && err.message) || err || 'network');
@@ -394,16 +276,11 @@
     outsideTimer = clearTO(outsideTimer);
     graceTimer   = clearTO(graceTimer);
     dwellTarget  = null;
-    dwellAction  = null;
   }
 
   function beginDwell(el, action){
     if (dwelling || firing || inCooldown) return;
-    dwelling = true;
-    dwellTarget = el;
-    dwellAction = action;
-    startFill(el);
-
+    dwelling = true; dwellTarget = el; startFill(el);
     dwellTimer = setTimeout(()=>{ stopDwell(); fireUrl(el, action); }, dwellMs);
 
     (function watchInside(){
@@ -433,7 +310,6 @@
     })();
   }
 
-  // ===== Bind dwell to all ".dwellable" elements (tile + buttons) =====
   function bindDwell(el){
     el.addEventListener('pointerenter', (e)=>{ lastPos = {x:e.clientX,y:e.clientY}; beginDwell(el, el.dataset.action); });
     el.addEventListener('pointerdown',  (e)=>{ lastPos = {x:e.clientX,y:e.clientY}; beginDwell(el, el.dataset.action); });
@@ -444,11 +320,10 @@
   }
   document.querySelectorAll('.dwellable').forEach(bindDwell);
 
-  // Track pointer globally for gaze/mouse
   window.addEventListener('pointermove', (e)=>{ lastPos = {x:e.clientX, y:e.clientY}; }, {passive:true});
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
-  log(`ready · mode=${initialMode} · dwell=${dwellMs}ms · tuyarelay2 firemode=${fireMode} ms=${testMs}`);
+  log(`ready · base=${BASE} · mode=${initialMode} · dwell=${dwellMs}ms · t2 firemode=${fireMode} ms=${testMs}`);
 </script>
 </body>
 </html>
