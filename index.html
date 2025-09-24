@@ -271,6 +271,10 @@
   const initialAction = (qs.get('action') || LS.get('dwell_action', 'plug1')).toLowerCase();
   const initialMode   = (qs.get('mode') || LS.get('ui_mode', 'dwell')).toLowerCase();
 
+  // TEST params for tuyarelay2 only:
+  const testMs   = Math.max(100, parseInt(qs.get('ms') || '1500', 10));   // duration for momentary
+  const fireMode = (qs.get('firemode') || 'momentary').toLowerCase();     // 'momentary' | 'toggle'
+
   actionSelect.value = ['plug1','plug2','tuyarelay1','tuyarelay2'].includes(initialAction) ? initialAction : 'plug1';
   actionSelect.addEventListener('change', () => { LS.set('dwell_action', actionSelect.value); dwellWrap.dataset.action = actionSelect.value; log('dwell action=', actionSelect.value); });
   dwellWrap.dataset.action = actionSelect.value;
@@ -320,6 +324,7 @@
 
   function urlFor(action){ return URLS[action] || URLS.plug1; }
 
+  // ===== ONLY tuyarelay2 reads fireMode & testMs and sends JSON to HA
   async function fireUrl(targetEl, action){
     if (firing || inCooldown) return;
     firing = true; inCooldown = true;
@@ -328,13 +333,19 @@
     const url = urlFor(action);
     log('POST →', url, '· action=', action);
 
+    const body = { from:"github-page", action };
+    if (action === 'tuyarelay2') {
+      body.mode = fireMode;          // 'momentary' or 'toggle'
+      body.duration_ms = testMs;     // e.g., 2500
+    }
+
     try{
       const controller = new AbortController();
       const to = setTimeout(()=>controller.abort('timeout'), 8000);
       const res = await fetch(url + `?t=${Date.now()}`, {
         method:'POST',
         headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ from:"github-page", action }),
+        body: JSON.stringify(body),
         cache:'no-store', credentials:'omit', redirect:'follow', signal: controller.signal
       });
       clearTimeout(to);
@@ -400,12 +411,10 @@
 
   // ===== Bind dwell to all ".dwellable" elements (tile + buttons) =====
   function bindDwell(el){
-    const action = el.dataset.action;
     el.addEventListener('pointerenter', (e)=>{ lastPos = {x:e.clientX,y:e.clientY}; beginDwell(el, el.dataset.action); });
     el.addEventListener('pointerdown',  (e)=>{ lastPos = {x:e.clientX,y:e.clientY}; beginDwell(el, el.dataset.action); });
     el.addEventListener('pointermove',  (e)=>{ lastPos = {x:e.clientX,y:e.clientY}; });
-    el.addEventListener('pointerleave', (e)=>{ lastPos = {x:e.clientX,y:e.clientY}; if (elContainsPoint(el,lastPos.x,lastPos.y)) return; /* watchdog handles */ });
-    // Click / keyboard quick trigger
+    el.addEventListener('pointerleave', (e)=>{ lastPos = {x:e.clientX,y:e.clientY}; if (elContainsPoint(el,lastPos.x,lastPos.y)) return; });
     el.addEventListener('click', (e)=>{ e.preventDefault(); stopDwell(); fireUrl(el, el.dataset.action); });
     el.addEventListener('keydown', (e)=>{ if (e.code==='Space'||e.code==='Enter'){ e.preventDefault(); stopDwell(); fireUrl(el, el.dataset.action); }});
   }
@@ -415,7 +424,7 @@
   window.addEventListener('pointermove', (e)=>{ lastPos = {x:e.clientX, y:e.clientY}; }, {passive:true});
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
-  log(`ready · mode=${initialMode} · dwell=${dwellMs}ms (hovers trigger actions)`);
+  log(`ready · mode=${initialMode} · dwell=${dwellMs}ms · test(tuyarelay2): firemode=${fireMode} ms=${testMs}`);
 </script>
 </body>
 </html>
