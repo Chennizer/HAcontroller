@@ -37,10 +37,10 @@
   }
   #settingsIcon:active{ transform:scale(.98); }
 
-  /* ===== Options panel (no URL editing) ===== */
+  /* ===== Options panel ===== */
   #menuPanel{
     position:fixed; top:70px; right:14px;
-    width:min(380px, 92vw);
+    width:min(420px, 94vw);
     background:var(--panel-bg); color:var(--panel-fg);
     border:2px solid #111; border-radius:12px;
     box-shadow:0 20px 50px rgba(0,0,0,.55);
@@ -148,6 +148,12 @@
     <label><input type="radio" name="mode" value="dwell"> Carré (dwell)</label>
     <label><input type="radio" name="mode" value="buttons2"> 2 boutons (plug1 + tuyarelay1)</label>
     <label><input type="radio" name="mode" value="buttons4"> 4 boutons (tous)</label>
+  </div>
+
+  <h3>Tuya relais 2 — Mode d’action</h3>
+  <div class="radio" role="radiogroup" aria-label="Mode d’action pour tuyarelay2">
+    <label><input type="radio" name="fireMode2" value="momentary"> Momentané (ON → attente → OFF)</label>
+    <label><input type="radio" name="fireMode2" value="toggle"> Bascule (TOGGLE)</label>
   </div>
 
   <h3>Action du carré (dwell)</h3>
@@ -271,16 +277,34 @@
   const initialAction = (qs.get('action') || LS.get('dwell_action', 'plug1')).toLowerCase();
   const initialMode   = (qs.get('mode') || LS.get('ui_mode', 'dwell')).toLowerCase();
 
-  // TEST params for tuyarelay2 only:
+  // --- test params for tuyarelay2 only (duration still via URL) ---
+  const qsFireMode   = (qs.get('firemode') || '').toLowerCase();
+  const savedFire    = (LS.get('tuyarelay2_firemode', 'momentary') || 'momentary').toLowerCase();
+  let fireMode = (qsFireMode === 'momentary' || qsFireMode === 'toggle') ? qsFireMode : savedFire;
   const testMs   = Math.max(100, parseInt(qs.get('ms') || '1500', 10));   // duration for momentary
-  const fireMode = (qs.get('firemode') || 'momentary').toLowerCase();     // 'momentary' | 'toggle'
 
   actionSelect.value = ['plug1','plug2','tuyarelay1','tuyarelay2'].includes(initialAction) ? initialAction : 'plug1';
-  actionSelect.addEventListener('change', () => { LS.set('dwell_action', actionSelect.value); dwellWrap.dataset.action = actionSelect.value; log('dwell action=', actionSelect.value); });
+  actionSelect.addEventListener('change', () => {
+    LS.set('dwell_action', actionSelect.value);
+    dwellWrap.dataset.action = actionSelect.value;
+    log('dwell action=', actionSelect.value);
+  });
   dwellWrap.dataset.action = actionSelect.value;
 
   setMode(['dwell','buttons2','buttons4'].includes(initialMode) ? initialMode : 'dwell');
   document.querySelector(`input[name="mode"][value="${initialMode}"]`)?.setAttribute('checked','checked');
+
+  // ===== NEW: Wire the fire mode radios for tuyarelay2 =====
+  const fireRadios = () => [...document.querySelectorAll('input[name="fireMode2"]')];
+  function setFireModeUI(modeStr){
+    fireRadios().forEach(r => r.checked = (r.value === modeStr));
+  }
+  setFireModeUI(fireMode);
+  fireRadios().forEach(r => r.addEventListener('change', () => {
+    fireMode = r.value; // 'momentary' | 'toggle'
+    LS.set('tuyarelay2_firemode', fireMode);
+    log('tuyarelay2 firemode =', fireMode);
+  }));
 
   // ===== Dwell/cancel tunables =====
   const dwellMs     = Math.max(200, parseInt(qs.get('dwell')   || '1500', 10));
@@ -336,7 +360,7 @@
     const body = { from:"github-page", action };
     if (action === 'tuyarelay2') {
       body.mode = fireMode;          // 'momentary' or 'toggle'
-      body.duration_ms = testMs;     // e.g., 2500
+      body.duration_ms = testMs;     // still from URL for now
     }
 
     try{
@@ -424,7 +448,7 @@
   window.addEventListener('pointermove', (e)=>{ lastPos = {x:e.clientX, y:e.clientY}; }, {passive:true});
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
-  log(`ready · mode=${initialMode} · dwell=${dwellMs}ms · test(tuyarelay2): firemode=${fireMode} ms=${testMs}`);
+  log(`ready · mode=${initialMode} · dwell=${dwellMs}ms · tuyarelay2 firemode=${fireMode} ms=${testMs}`);
 </script>
 </body>
 </html>
