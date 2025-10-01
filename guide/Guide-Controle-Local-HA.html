@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide — Contrôle Local HA (Dwell + Impulsion / Toggle)</title>
+<style>
+  :root{{--bg:#0b0d10;--fg:#e8eef5;--panel:#111620;--border:#1b2534;--accent:#ff2a8a}}
+  *{{box-sizing:border-box}}
+  body{{margin:0;background:linear-gradient(180deg,#0b0d10,#0b0d10 60%,#0e1218);color:var(--fg);font:16px/1.6 Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;padding:24px}}
+  .wrap{{max-width:980px;margin:0 auto}}
+  h1{{font-size:28px;margin:0 0 14px}}
+  h2{{font-size:22px;margin:26px 0 10px}}
+  h3{{font-size:18px;margin:18px 0 8px}}
+  p,li,code,pre{{font-size:16px}}
+  .card{{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin:14px 0;box-shadow:0 10px 28px rgba(0,0,0,.35)}}
+  code,pre{{background:#0a0e14;border:1px solid #101621;border-radius:10px;padding:12px;display:block;overflow:auto}}
+  .pill{{display:inline-block;border:1px solid var(--border);background:#0a0e14;border-radius:999px;padding:4px 10px;margin-right:6px}}
+  .accent{{color:var(--accent);font-weight:700}}
+  a{{color:#8ed0ff}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Guide — Contrôle Local Home Assistant (Dwell + Impulsion / Toggle)</h1>
+  <div class="card">
+    <p>Ce kit contient :</p>
+    <ul>
+      <li><span class="pill">controller.html</span> — page de contrôle (eyegaze, dwell, impulsion/toggle)</li>
+      <li><span class="pill">automations/ping.yaml</span> — test de webhook</li>
+      <li><span class="pill">automations/pulse_control.yaml</span> — automatisation générique</li>
+    </ul>
+    <p>Dernière génération : 2025-09-27 13:42:47</p>
+  </div>
+
+  <h2>1) Installer Home Assistant OS sur Raspberry Pi</h2>
+  <div class="card">
+    <ol>
+      <li>Flashez <b>Home Assistant OS</b> sur un <b>SSD USB 3.0</b> avec Raspberry Pi Imager.</li>
+      <li>Démarrez le Pi (Ethernet conseillé) et ouvrez <code>http://homeassistant.local:8123</code> ou l’IP locale.</li>
+      <li>Finissez l’assistant et créez un utilisateur admin.</li>
+    </ol>
+  </div>
+
+  <h2>2) Créer les automatisations</h2>
+  <div class="card">
+    <h3>2.1. Ping (test)</h3>
+    <p>Dans Home Assistant → <i>Paramètres &gt; Automatisations &amp; Scènes &gt; Automatisations</i> → <b>+ Créer</b> → <b>Éditeur YAML</b>, collez :</p>
+    <pre>alias: Webhook PING (test)
+mode: single
+trigger:
+  - platform: webhook
+    webhook_id: pingtest
+    allowed_methods: [GET, POST]
+    local_only: true
+condition: []
+action:
+  - service: persistent_notification.create
+    data:
+      title: "PING reçu"
+      message: "OK à {{ now() }}"
+</pre>
+
+    <h3>2.2. Contrôle générique (impulsion / toggle)</h3>
+    <p>Remplacez <code>light.votre_appareil</code> par l’<code>entity_id</code> réel.</p>
+    <pre>alias: Contrôle local (impulsion ou toggle via webhook)
+description: "POST local : /api/webhook/pulse_control?mode=momentary|toggle&ms=1500"
+mode: single
+trigger:
+  - platform: webhook
+    webhook_id: pulse_control
+    allowed_methods: [GET, POST]
+    local_only: true
+condition: []
+action:
+  - variables:
+      mode: >-
+        {% set m = 'momentary' %}
+        {% if trigger is defined and trigger.query is defined and trigger.query.mode is defined %}
+          {% set m = trigger.query.mode | lower %}
+        {% elif trigger is defined and trigger.json is defined and trigger.json.mode is defined %}
+          {% set m = trigger.json.mode | lower %}
+        {% endif %}
+        {{ m }}
+      ms: >-
+        {% set val = 1500 %}
+        {% if trigger is defined and trigger.query is defined and trigger.query.ms is defined %}
+          {% set val = trigger.query.ms | int %}
+        {% elif trigger is defined and trigger.json is defined and trigger.json.ms is defined %}
+          {% set val = trigger.json.ms | int %}
+        {% endif %}
+        {{ [ [val, 60000] | min, 50 ] | max }}
+  - service: persistent_notification.create
+    data:
+      title: "Webhook reçu"
+      message: "mode={{ mode }}, ms={{ ms }}"
+  - choose:
+      - conditions: "{{ mode == 'toggle' }}"
+        sequence:
+          - service: light.toggle
+            target: { entity_id: light.votre_appareil }   # <-- remplacez par votre entité
+    default:
+      - service: light.turn_on
+        target: { entity_id: light.votre_appareil }       # <-- remplacez par votre entité
+      - delay: "{{ ms / 1000 }}"
+      - service: light.turn_off
+        target: { entity_id: light.votre_appareil }       # <-- remplacez par votre entité
+</pre>
+
+    <p>Tests :</p>
+    <ul>
+      <li>Impulsion 1200 ms : <code>http://ADRESSE-IP-DU-PI:8123/api/webhook/pulse_control?mode=momentary&amp;ms=1200</code></li>
+      <li>Toggle : <code>http://ADRESSE-IP-DU-PI:8123/api/webhook/pulse_control?mode=toggle</code></li>
+    </ul>
+  </div>
+
+  <h2>3) Déployer la page <code>controller.html</code></h2>
+  <div class="card">
+    <ol>
+      <li>Ouvrez <code>controller.html</code> et remplacez la constante <code>BASE</code> par l’IP locale de HA.</li>
+      <li>Copiez le fichier dans <code>config/www/</code> (sur Home Assistant).</li>
+      <li>Ouvrez la page : <code>http://ADRESSE-IP-DU-PI:8123/local/controller.html</code></li>
+    </ol>
+    <p>Dans la page : bouton <b>⚙️</b> → définissez la <b>Durée (ms)</b> et le <b>Mode</b> (Momentané/Bascule). Survolez la grande tuile pour déclencher (dwell) ou cliquez/Clavier.</p>
+  </div>
+
+  <h2>Dépannage</h2>
+  <div class="card">
+    <ul>
+      <li><b>Rien ne se passe :</b> vérifiez l’IP, le <code>webhook_id</code>, et consultez <i>Traces</i> dans l’automatisation.</li>
+      <li><b>L’appareil ne réagit pas :</b> utilisez le bon domaine (<code>light</code> vs <code>switch</code>) et le bon <code>entity_id</code>.</li>
+      <li><b>Mixed content (HTTPS/HTTP) :</b> en local simple, laissez tout en HTTP.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
