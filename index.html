@@ -221,12 +221,20 @@
   const resetImageBtn= document.getElementById('resetImageBtn');
 
   // Liste d’images exemple (remplace par tes chemins)
-  const IMAGES = [
-    { label: '— aucune —', value: '' },
-    { label: 'Lanternes (ex.)', value: '../../images/fills/lanterns.webp' },
-    { label: 'Foudre (ex.)',    value: '../../images/fills/lightning.png' },
-    { label: 'Onigiri (ex.)',   value: '../../images/fills/onigiri.png' }
-  ];
+const IMAGES = [
+  { label: '— aucune —', value: '' },
+  { label: 'Voiture de sport', value: 'images/sportscar.png' },
+  { label: 'Excavatrice',      value: 'images/excavator.png' },
+  { label: 'Bouteur (bulldozer)', value: 'images/bulldozer.png' },
+  { label: 'Autobus',          value: 'images/bus.png' },
+  { label: 'Éléphant',         value: 'images/elephant.png' },
+  { label: 'Guitare',          value: 'images/guitar.png' },
+  { label: 'Ventilateur',      value: 'images/fan.png' },
+  { label: 'Ampoule',          value: 'images/lampbulb.png' },
+  { label: 'Mélangeur',        value: 'images/standmixer.png' },
+  { label: 'Ourson en peluche', value: 'images/teddybear.png' },
+  { label: 'Machine à bulles', value: 'images/bubblemachine.png' }
+];
 
   function populateImagePreset(){
     imagePreset.innerHTML = '';
