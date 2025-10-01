@@ -10,7 +10,7 @@
     --bg:#000; --fg:#fff;
     --tile:#111; --tile-border:#333;
     --ok:#1ec97f; --err:#ff6b6b;
-    --fill: rgba(255,0,0,.65);
+    --fill: rgba(255,0,0,.5); /* plus léger = semi-transparent */
     --size: clamp(260px, 50vmin, 520px);
     --dwell: 1500ms;
     --panel-bg:#ffffff; --panel-fg:#000;
@@ -48,15 +48,33 @@
   .show-image .icon{ opacity:0; }
   .show-image .content-img{ display:block; }
 
-  /* Overlay de remplissage: conservé tel quel */
-  .fill{ position:absolute; inset:0; margin:auto; width:100%; height:100%; background:var(--fill); border-radius:inherit; transform: scale(0); transform-origin: 50% 50%; pointer-events:none; will-change: transform; z-index:1; }
+  /* Overlay de remplissage: au-dessus de tout (image incluse) */
+  .fill{
+    position:absolute; inset:0; margin:auto; width:100%; height:100%;
+    background:var(--fill);
+    border-radius:inherit;
+    transform: scale(0); transform-origin: 50% 50%;
+    pointer-events:none; will-change: transform;
+    z-index:9; /* > image (z-index:2) */
+  }
   .fill.filling{ transition: transform var(--dwell) linear; transform: scale(1); }
 
   .grid{ display:grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap:18px; width:min(920px, 94vw); }
-  .grid.four{ grid-template-columns: repeat(4, minmax(140px, 1fr)); }
-  .btnCard{ background:#101010; border:2px solid #2b2b2b; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,.35); overflow:hidden; cursor:pointer; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:stretch; width:100%; min-height:180px; touch-action:none; }
+
+  /* 4 boutons = grille 2×2 avec taille confortable */
+  .grid.four{ grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+
+  .btnCard{
+    background:#101010; border:2px solid #2b2b2b; border-radius:16px;
+    box-shadow:0 8px 24px rgba(0,0,0,.35); overflow:hidden; cursor:pointer;
+    position:relative; display:flex; flex-direction:column; align-items:center; justify-content:stretch;
+    width:100%; min-height:220px; /* taille confortable */
+    touch-action:none;
+  }
   .btnCard.active{ outline:3px solid var(--ok); outline-offset:-3px; }
   .btnCard.error { outline:3px solid var(--err); outline-offset:-3px; }
+
+  /* Visuel interne de la carte */
   .pic{ width:100%; aspect-ratio:16/10; display:block; background:#181818; object-fit:cover; }
   .label{ width:100%; padding:10px 12px; text-align:center; color:#ddd; font-weight:700; border-top:1px solid #2b2b2b; }
 
@@ -95,7 +113,7 @@
     <option value="tuyarelay2">Relais 2 — tuyarelay2</option>
   </select>
 
-  <!-- Nouveau : Images de contenu -->
+  <!-- Images de contenu -->
   <h3>Image du contenu</h3>
   <div class="row">
     <div class="cols">
@@ -116,7 +134,7 @@
     </div>
 
     <label for="imageUrl">…ou coller une URL/chemin personnalisé</label>
-    <input id="imageUrl" type="url" placeholder="../../images/fills/mon-visuel.webp" />
+    <input id="imageUrl" type="url" placeholder="images/mon-visuel.webp" />
 
     <div class="applyRow">
       <button id="applyImageBtn" type="button">Appliquer</button>
@@ -132,7 +150,7 @@
     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
     </svg>
-    <!-- Image de contenu injectée/actualisée au besoin -->
+    <!-- Image de contenu -->
     <img id="dwellContentImg" class="content-img" alt="Visuel de la case" />
     <div class="fill"></div>
   </div>
@@ -213,28 +231,27 @@
   const msInput      = document.getElementById('msInput');
   const hud = document.getElementById('hud');
 
-  // --- Image controls (nouveau)
+  // --- Image controls
   const targetSelect = document.getElementById('targetSelect');
   const imagePreset  = document.getElementById('imagePreset');
   const imageUrl     = document.getElementById('imageUrl');
   const applyImageBtn= document.getElementById('applyImageBtn');
   const resetImageBtn= document.getElementById('resetImageBtn');
 
-  // Liste d’images exemple (remplace par tes chemins)
-const IMAGES = [
-  { label: '— aucune —', value: '' },
-  { label: 'Voiture de sport', value: 'images/sportscar.png' },
-  { label: 'Excavatrice',      value: 'images/excavator.png' },
-  { label: 'Bouteur (bulldozer)', value: 'images/bulldozer.png' },
-  { label: 'Autobus',          value: 'images/bus.png' },
-  { label: 'Éléphant',         value: 'images/elephant.png' },
-  { label: 'Guitare',          value: 'images/guitar.png' },
-  { label: 'Ventilateur',      value: 'images/fan.png' },
-  { label: 'Ampoule',          value: 'images/lampbulb.png' },
-  { label: 'Mélangeur',        value: 'images/standmixer.png' },
-  { label: 'Ourson en peluche', value: 'images/teddybear.png' },
-  { label: 'Machine à bulles', value: 'images/bubblemachine.png' }
-];
+  const IMAGES = [
+    { label: '— aucune —', value: '' },
+    { label: 'Voiture de sport', value: 'images/sportscar.png' },
+    { label: 'Excavatrice',      value: 'images/excavator.png' },
+    { label: 'Bouteur (bulldozer)', value: 'images/bulldozer.png' },
+    { label: 'Autobus',          value: 'images/bus.png' },
+    { label: 'Éléphant',         value: 'images/elephant.png' },
+    { label: 'Guitare',          value: 'images/guitar.png' },
+    { label: 'Ventilateur',      value: 'images/fan.png' },
+    { label: 'Ampoule',          value: 'images/lampbulb.png' },
+    { label: 'Mélangeur',        value: 'images/standmixer.png' },
+    { label: 'Ourson en peluche', value: 'images/teddybear.png' },
+    { label: 'Machine à bulles', value: 'images/bubblemachine.png' }
+  ];
 
   function populateImagePreset(){
     imagePreset.innerHTML = '';
@@ -278,17 +295,21 @@ const IMAGES = [
   modeRadios().forEach(r => r.addEventListener('change', () => setMode(r.value)));
 
   // ===== Initial selection =====
-  const initialAction = (qs.get('action') || LS.get('dwell_action', 'plug1')).toLowerCase();
-  const initialMode   = (qs.get('mode') || LS.get('ui_mode', 'dwell')).toLowerCase();
-  actionSelect.value = ['plug1','plug2','tuyarelay1','tuyarelay2'].includes(initialAction) ? initialAction : 'plug1';
+  const qsInitialAction = (qs.get('action') || LS.get('dwell_action', 'plug1')).toLowerCase();
+  const qsInitialMode   = (qs.get('mode') || LS.get('ui_mode', 'dwell')).toLowerCase();
+  const initialAction = ['plug1','plug2','tuyarelay1','tuyarelay2'].includes(qsInitialAction) ? qsInitialAction : 'plug1';
+  const initialMode   = ['dwell','buttons2','buttons4'].includes(qsInitialMode) ? qsInitialMode : 'dwell';
+
+  actionSelect.value = initialAction;
+  dwellWrap.dataset.action = actionSelect.value;
+  setMode(initialMode);
+  document.querySelector(`input[name="mode"][value="${initialMode}"]`)?.setAttribute('checked','checked');
+
   actionSelect.addEventListener('change', () => {
     LS.set('dwell_action', actionSelect.value);
     dwellWrap.dataset.action = actionSelect.value;
     log('dwell action=', actionSelect.value);
   });
-  dwellWrap.dataset.action = actionSelect.value;
-  setMode(['dwell','buttons2','buttons4'].includes(initialMode) ? initialMode : 'dwell');
-  document.querySelector(`input[name="mode"][value="${initialMode}"]`)?.setAttribute('checked','checked');
 
   // ===== tuyarelay2 controls (ms + fireMode) =====
   const savedMs = parseInt(LS.get('tuyarelay2_ms', '1500'), 10);
@@ -450,9 +471,6 @@ const IMAGES = [
     if (!el) return;
     if (url && url.trim()){
       el.src = url.trim();
-    }else{
-      // si vide, on laisse le placeholder data:svg déjà en src
-      // (tu peux aussi remettre un visuel de fallback ici si tu veux)
     }
   }
 
@@ -475,7 +493,6 @@ const IMAGES = [
 
     if (target === 'dwell') setDwellImage(clean);
     else{
-      // Certaines cibles existent en 2 panneaux (2-boutons et 4-boutons)
       if (target === 'plug1'){
         setCardImage('img_plug1', clean);
         setCardImage('img_plug1_b4', clean);
