@@ -20,24 +20,35 @@
   body{display:grid; place-items:center; background:var(--bg); color:var(--fg); font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; -webkit-tap-highlight-color:transparent;}
   #settingsIcon{position:fixed; top:14px; right:14px; width:44px; height:44px; border-radius:50%; background:var(--panel-bg); color:var(--panel-fg); border:2px solid #ff2a8a; display:flex; align-items:center; justify-content:center; font-size:22px; line-height:1; cursor:pointer; z-index:10010; box-shadow:0 10px 30px rgba(0,0,0,.6);}
   #settingsIcon:active{ transform:scale(.98); }
-  #menuPanel{position:fixed; top:70px; right:14px; width:min(440px, 94vw); background:var(--panel-bg); color:var(--panel-fg); border:2px solid #111; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,.55); padding:14px; z-index:10011; display:none;}
+  #menuPanel{position:fixed; top:70px; right:14px; width:min(480px, 94vw); background:var(--panel-bg); color:var(--panel-fg); border:2px solid #111; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,.55); padding:14px; z-index:10011; display:none;}
   #menuPanel.show{ display:block; }
-  #menuPanel h2{ margin:0 0 10px; font-size:18px; }
-  #menuPanel h3{ margin:12px 0 6px; font-size:15px; }
+  #menuPanel h2{ margin:0 0 12px; font-size:18px; }
+  #menuPanel h3{ margin:14px 0 8px; font-size:15px; }
   #menuPanel .radio{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
   #menuPanel label{ font-weight:600; }
-  #menuPanel select, #menuPanel input[type="number"]{
+  #menuPanel select, #menuPanel input[type="number"], #menuPanel input[type="url"]{
     width:100%; background:#fff; color:#000; border:2px solid #222; border-radius:10px;
     padding:10px 12px; outline:none; font:inherit;
   }
+  #menuPanel .row{ display:grid; grid-template-columns:1fr; gap:8px; }
+  #menuPanel .cols{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  #menuPanel .applyRow{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 
   .center{ display:grid; place-items:center; gap:18px; }
   .tile{ width:var(--size); height:var(--size); display:grid; place-items:center; background:var(--tile); border:2px solid var(--tile-border); border-radius:24px; position:relative; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.5); touch-action:none; }
-  .icon{ width:40%; max-width:220px; aspect-ratio:1/1; display:block }
+  .icon{ width:40%; max-width:220px; aspect-ratio:1/1; display:block; transition:opacity .2s ease; }
   .icon path{ fill:#ddd; transition:fill .2s ease }
   .active .icon path{ fill:var(--ok) }
   .error  .icon path{ fill:var(--err) }
 
+  /* Contenu image pour la "case" (carré dwell) */
+  .content-img{
+    width:80%; max-width:360px; height:auto; object-fit:contain; display:none; z-index:2;
+  }
+  .show-image .icon{ opacity:0; }
+  .show-image .content-img{ display:block; }
+
+  /* Overlay de remplissage: conservé tel quel */
   .fill{ position:absolute; inset:0; margin:auto; width:100%; height:100%; background:var(--fill); border-radius:inherit; transform: scale(0); transform-origin: 50% 50%; pointer-events:none; will-change: transform; z-index:1; }
   .fill.filling{ transition: transform var(--dwell) linear; transform: scale(1); }
 
@@ -83,24 +94,59 @@
     <option value="tuyarelay1">Relais 1 — tuyarelay1</option>
     <option value="tuyarelay2">Relais 2 — tuyarelay2</option>
   </select>
+
+  <!-- Nouveau : Images de contenu -->
+  <h3>Image du contenu</h3>
+  <div class="row">
+    <div class="cols">
+      <div>
+        <label for="targetSelect">Cible à illustrer</label>
+        <select id="targetSelect" aria-label="Choisir la cible">
+          <option value="dwell">Carré (dwell)</option>
+          <option value="plug1">Carte: plug1</option>
+          <option value="plug2">Carte: plug2</option>
+          <option value="tuyarelay1">Carte: tuyarelay1</option>
+          <option value="tuyarelay2">Carte: tuyarelay2</option>
+        </select>
+      </div>
+      <div>
+        <label for="imagePreset">Choisir une image (liste)</label>
+        <select id="imagePreset"></select>
+      </div>
+    </div>
+
+    <label for="imageUrl">…ou coller une URL/chemin personnalisé</label>
+    <input id="imageUrl" type="url" placeholder="../../images/fills/mon-visuel.webp" />
+
+    <div class="applyRow">
+      <button id="applyImageBtn" type="button">Appliquer</button>
+      <button id="resetImageBtn" type="button">Réinitialiser</button>
+      <small style="opacity:.8">Le SVG reste si aucune image n’est définie. Les choix sont mémorisés localement.</small>
+    </div>
+  </div>
 </div>
 
 <div class="center">
   <div id="dwellWrap" class="tile dwellable" data-action="plug1" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
+    <!-- SVG par défaut (fallback) -->
     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
     </svg>
+    <!-- Image de contenu injectée/actualisée au besoin -->
+    <img id="dwellContentImg" class="content-img" alt="Visuel de la case" />
     <div class="fill"></div>
   </div>
 
   <div id="buttons2Wrap" class="grid" style="display:none" aria-label="Panneau 2 boutons">
     <button class="btnCard dwellable" data-action="plug1" aria-label="Prise 1 — plug1">
-      <img class="pic" alt="plug1" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>plug1</text></svg>">
+      <img class="pic" alt="plug1" id="img_plug1"
+           src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>plug1</text></svg>">
       <div class="label">plug1</div>
       <div class="fill"></div>
     </button>
     <button class="btnCard dwellable" data-action="tuyarelay1" aria-label="Relais 1 — tuyarelay1">
-      <img class="pic" alt="tuyarelay1" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>tuyarelay1</text></svg>">
+      <img class="pic" alt="tuyarelay1" id="img_tuyarelay1"
+           src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>tuyarelay1</text></svg>">
       <div class="label">tuyarelay1</div>
       <div class="fill"></div>
     </button>
@@ -108,22 +154,26 @@
 
   <div id="buttons4Wrap" class="grid four" style="display:none" aria-label="Panneau 4 boutons">
     <button class="btnCard dwellable" data-action="plug1" aria-label="Prise 1 — plug1">
-      <img class="pic" alt="plug1" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>plug1</text></svg>">
+      <img class="pic" alt="plug1" id="img_plug1_b4"
+           src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>plug1</text></svg>">
       <div class="label">plug1</div>
       <div class="fill"></div>
     </button>
     <button class="btnCard dwellable" data-action="plug2" aria-label="Prise 2 — plug2">
-      <img class="pic" alt="plug2" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>plug2</text></svg>">
+      <img class="pic" alt="plug2" id="img_plug2"
+           src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>plug2</text></svg>">
       <div class="label">plug2</div>
       <div class="fill"></div>
     </button>
     <button class="btnCard dwellable" data-action="tuyarelay1" aria-label="Relais 1 — tuyarelay1">
-      <img class="pic" alt="tuyarelay1" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>tuyarelay1</text></svg>">
+      <img class="pic" alt="tuyarelay1" id="img_tuyarelay1_b4"
+           src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>tuyarelay1</text></svg>">
       <div class="label">tuyarelay1</div>
       <div class="fill"></div>
     </button>
     <button class="btnCard dwellable" data-action="tuyarelay2" aria-label="Relais 2 — tuyarelay2">
-      <img class="pic" alt="tuyarelay2" src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>tuyarelay2</text></svg>">
+      <img class="pic" alt="tuyarelay2" id="img_tuyarelay2"
+           src="data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'><rect width='160' height='100' fill='%23181818'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='Arial' font-size='16'>tuyarelay2</text></svg>">
       <div class="label">tuyarelay2</div>
       <div class="fill"></div>
     </button>
@@ -157,10 +207,36 @@
   const menuPanel = document.getElementById('menuPanel');
   const actionSelect = document.getElementById('actionSelect');
   const dwellWrap    = document.getElementById('dwellWrap');
+  const dwellContentImg = document.getElementById('dwellContentImg');
   const buttons2Wrap = document.getElementById('buttons2Wrap');
   const buttons4Wrap = document.getElementById('buttons4Wrap');
   const msInput      = document.getElementById('msInput');
   const hud = document.getElementById('hud');
+
+  // --- Image controls (nouveau)
+  const targetSelect = document.getElementById('targetSelect');
+  const imagePreset  = document.getElementById('imagePreset');
+  const imageUrl     = document.getElementById('imageUrl');
+  const applyImageBtn= document.getElementById('applyImageBtn');
+  const resetImageBtn= document.getElementById('resetImageBtn');
+
+  // Liste d’images exemple (remplace par tes chemins)
+  const IMAGES = [
+    { label: '— aucune —', value: '' },
+    { label: 'Lanternes (ex.)', value: '../../images/fills/lanterns.webp' },
+    { label: 'Foudre (ex.)',    value: '../../images/fills/lightning.png' },
+    { label: 'Onigiri (ex.)',   value: '../../images/fills/onigiri.png' }
+  ];
+
+  function populateImagePreset(){
+    imagePreset.innerHTML = '';
+    for (const opt of IMAGES){
+      const o = document.createElement('option');
+      o.value = opt.value; o.textContent = opt.label;
+      imagePreset.appendChild(o);
+    }
+  }
+  populateImagePreset();
 
   function toggleMenu(force){
     const willShow = (typeof force === 'boolean') ? force : !menuPanel.classList.contains('show');
@@ -175,8 +251,11 @@
   // ===== LocalStorage =====
   const LS = {
     get(k, def){ try{ const v = localStorage.getItem(k); return v ?? def; }catch{return def;} },
-    set(k, v){ try{ localStorage.setItem(k, v); }catch{} }
+    set(k, v){ try{ localStorage.setItem(k, v); }catch{} },
+    del(k){ try{ localStorage.removeItem(k);}catch{} }
   };
+
+  function log(...a){ console.log(...a); hud.textContent = a.map(String).join(' '); }
 
   // ===== Mode handling =====
   const modeRadios = () => [...document.querySelectorAll('input[name="mode"]')];
@@ -204,7 +283,6 @@
   document.querySelector(`input[name="mode"][value="${initialMode}"]`)?.setAttribute('checked','checked');
 
   // ===== tuyarelay2 controls (ms + fireMode) =====
-  // Load saved values or defaults
   const savedMs = parseInt(LS.get('tuyarelay2_ms', '1500'), 10);
   msInput.value = isFinite(savedMs) ? savedMs : 1500;
 
@@ -234,7 +312,6 @@
   let firing = false, inCooldown = false, dwelling = false;
   let lastPos = { x: 0, y: 0 };
 
-  function log(...a){ console.log(...a); hud.textContent = a.map(String).join(' '); }
   function ensureFill(el){ let f = el.querySelector('.fill'); if (!f){ f = document.createElement('div'); f.className='fill'; el.appendChild(f); } return f; }
   function startFill(el){ const f = ensureFill(el); f.classList.remove('filling'); void f.offsetWidth; f.classList.add('filling'); }
   function cancelFill(el){ const f = el.querySelector('.fill'); if (f) f.classList.remove('filling'); }
@@ -339,6 +416,113 @@
   // Pointer tracking + visibility
   window.addEventListener('pointermove', (e)=>{ lastPos = {x:e.clientX, y:e.clientY}; }, {passive:true});
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
+
+  // ========= GESTION DES IMAGES DE CONTENU =========
+  // Clés LS: img_dwell, img_plug1, img_plug2, img_tuyarelay1, img_tuyarelay2
+  const LS_KEYS = {
+    dwell:'img_dwell',
+    plug1:'img_plug1',
+    plug2:'img_plug2',
+    tuyarelay1:'img_tuyarelay1',
+    tuyarelay2:'img_tuyarelay2'
+  };
+
+  function setDwellImage(url){
+    if (url && url.trim()){
+      dwellContentImg.src = url.trim();
+      dwellWrap.classList.add('show-image');
+    }else{
+      dwellContentImg.removeAttribute('src');
+      dwellWrap.classList.remove('show-image'); // revient au SVG
+    }
+  }
+
+  function setCardImage(id, url){
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (url && url.trim()){
+      el.src = url.trim();
+    }else{
+      // si vide, on laisse le placeholder data:svg déjà en src
+      // (tu peux aussi remettre un visuel de fallback ici si tu veux)
+    }
+  }
+
+  function applySavedImages(){
+    setDwellImage(LS.get(LS_KEYS.dwell, ''));
+    setCardImage('img_plug1',       LS.get(LS_KEYS.plug1, ''));
+    setCardImage('img_plug1_b4',    LS.get(LS_KEYS.plug1, ''));
+    setCardImage('img_plug2',       LS.get(LS_KEYS.plug2, ''));
+    setCardImage('img_tuyarelay1',  LS.get(LS_KEYS.tuyarelay1, ''));
+    setCardImage('img_tuyarelay1_b4',LS.get(LS_KEYS.tuyarelay1, ''));
+    setCardImage('img_tuyarelay2',  LS.get(LS_KEYS.tuyarelay2, ''));
+  }
+  applySavedImages();
+
+  function saveAndApplyTarget(target, url){
+    const key = LS_KEYS[target];
+    if (!key) return;
+    const clean = (url||'').trim();
+    if (clean) LS.set(key, clean); else LS.del(key);
+
+    if (target === 'dwell') setDwellImage(clean);
+    else{
+      // Certaines cibles existent en 2 panneaux (2-boutons et 4-boutons)
+      if (target === 'plug1'){
+        setCardImage('img_plug1', clean);
+        setCardImage('img_plug1_b4', clean);
+      }else if (target === 'tuyarelay1'){
+        setCardImage('img_tuyarelay1', clean);
+        setCardImage('img_tuyarelay1_b4', clean);
+      }else{
+        setCardImage(`img_${target}`, clean);
+      }
+    }
+    log('image set:', target, clean || '(none)');
+  }
+
+  // UI events pour sélection d’image
+  imagePreset.addEventListener('change', ()=>{
+    if (imagePreset.value) imageUrl.value = imagePreset.value;
+  });
+
+  applyImageBtn.addEventListener('click', ()=>{
+    const target = targetSelect.value;
+    const url = imageUrl.value || imagePreset.value || '';
+    saveAndApplyTarget(target, url);
+  });
+
+  resetImageBtn.addEventListener('click', ()=>{
+    const target = targetSelect.value;
+    saveAndApplyTarget(target, '');
+    imageUrl.value = '';
+    imagePreset.value = '';
+  });
+
+  // Auto-préselection du preset si une image est déjà sauvegardée
+  (function reflectCurrentSelection(){
+    const t = targetSelect.value;
+    const key = LS_KEYS[t];
+    if (!key) return;
+    const cur = LS.get(key, '');
+    if (cur){
+      imageUrl.value = cur;
+      const preset = IMAGES.find(i=>i.value===cur);
+      imagePreset.value = preset ? preset.value : '';
+    }else{
+      imageUrl.value = '';
+      imagePreset.value = '';
+    }
+  })();
+
+  // Quand on change de cible, on reflète sa valeur sauvegardée
+  targetSelect.addEventListener('change', ()=>{
+    const t = targetSelect.value;
+    const key = LS_KEYS[t];
+    const cur = LS.get(key, '');
+    imageUrl.value = cur || '';
+    imagePreset.value = IMAGES.find(i=>i.value===cur)?.value || '';
+  });
 
   log(`ready · base=${BASE}`);
 </script>
