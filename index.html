@@ -10,7 +10,7 @@
     --bg:#000; --fg:#fff;
     --tile:#111; --tile-border:#333;
     --ok:#1ec97f; --err:#ff6b6b;
-    --fill: rgba(255,0,0,.5); /* plus léger = semi-transparent */
+    --fill: rgba(255,0,0,.5); /* semi-transparent overlay */
     --size: clamp(260px, 50vmin, 520px);
     --dwell: 1500ms;
     --panel-bg:#ffffff; --panel-fg:#000;
@@ -35,62 +35,59 @@
   #menuPanel .applyRow{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 
   .center{ display:grid; place-items:center; gap:18px; }
-  .tile{ width:var(--size); height:var(--size); display:grid; place-items:center; background:var(--tile); border:2px solid var(--tile-border); border-radius:24px; position:relative; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.5); touch-action:none; }
-  .icon{ width:40%; max-width:220px; aspect-ratio:1/1; display:block; transition:opacity .2s ease; }
+  .tile{
+    width:var(--size); height:var(--size);
+    display:grid; place-items:center; /* centers children */
+    background:var(--tile); border:2px solid var(--tile-border);
+    border-radius:24px; position:relative; overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,.5); touch-action:none;
+  }
+  .icon{ width:40%; max-width:220px; aspect-ratio:1/1; display:block; }
   .icon path{ fill:#ddd; transition:fill .2s ease }
   .active .icon path{ fill:var(--ok) }
   .error  .icon path{ fill:var(--err) }
 
-.content-img{
-  max-width: 88%;
-  max-height: 88%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  display: none;
-  z-index: 2;
-}
-
-/* Card image: fit inside a fixed box without cropping */
-.pic{
-  width: 100%;
-  aspect-ratio: 16/10;
-  object-fit: contain;      /* was: cover */
-  background: #181818;      /* neutral matte behind transparent PNGs */
-  padding: 8px;             /* little gutter so borders/edges are visible */
-  display: block;
-}
-This keep
-  .show-image .icon{ opacity:0; }
+  /* Content image in dwell tile: centered & never cropped */
+  .content-img{
+    max-width:88%; max-height:88%;
+    width:auto; height:auto;
+    object-fit:contain; object-position:center;
+    display:none; z-index:2;
+    margin:auto; align-self:center; justify-self:center;
+  }
+  /* Hide the fallback SVG completely when an image is active */
+  .show-image .icon{ display:none !important; }
   .show-image .content-img{ display:block; }
 
-  /* Overlay de remplissage: au-dessus de tout (image incluse) */
+  /* Dwell overlay: sits above content image */
   .fill{
-    position:absolute; inset:0; margin:auto; width:100%; height:100%;
-    background:var(--fill);
-    border-radius:inherit;
-    transform: scale(0); transform-origin: 50% 50%;
-    pointer-events:none; will-change: transform;
-    z-index:9; /* > image (z-index:2) */
+    position:absolute; inset:0; width:100%; height:100%;
+    background:var(--fill); border-radius:inherit;
+    transform:scale(0); transform-origin:50% 50%;
+    pointer-events:none; will-change:transform;
+    z-index:9; /* above image (z-index:2) */
   }
   .fill.filling{ transition: transform var(--dwell) linear; transform: scale(1); }
 
   .grid{ display:grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap:18px; width:min(920px, 94vw); }
-
-  /* 4 boutons = grille 2×2 avec taille confortable */
+  /* 4 buttons → 2×2 grid */
   .grid.four{ grid-template-columns: repeat(2, minmax(220px, 1fr)); }
 
   .btnCard{
     background:#101010; border:2px solid #2b2b2b; border-radius:16px;
     box-shadow:0 8px 24px rgba(0,0,0,.35); overflow:hidden; cursor:pointer;
     position:relative; display:flex; flex-direction:column; align-items:center; justify-content:stretch;
-    width:100%; min-height:220px; /* taille confortable */
-    touch-action:none;
+    width:100%; min-height:220px; touch-action:none;
   }
   .btnCard.active{ outline:3px solid var(--ok); outline-offset:-3px; }
   .btnCard.error { outline:3px solid var(--err); outline-offset:-3px; }
 
-
+  /* Card image: centered & contained (no crop) */
+  .pic{
+    width:100%; aspect-ratio:16/10; display:block;
+    object-fit:contain; object-position:center; /* center, don't crop */
+    background:#181818; padding:8px;           /* breathing room to see borders */
+  }
   .label{ width:100%; padding:10px 12px; text-align:center; color:#ddd; font-weight:700; border-top:1px solid #2b2b2b; }
 
   .hud{ position:fixed; left:12px; bottom:12px; background:rgba(0,0,0,.55); color:#fff; padding:8px 10px; border-radius:10px; font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-width:80vw; white-space:pre-wrap; box-shadow:0 6px 20px rgba(0,0,0,.35); z-index:5; }
@@ -161,7 +158,7 @@ This keep
 
 <div class="center">
   <div id="dwellWrap" class="tile dwellable" data-action="plug1" aria-label="Activer (dwell)" role="button" tabindex="0" aria-live="polite">
-    <!-- SVG par défaut (fallback) -->
+    <!-- SVG de fallback -->
     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M11 2h2v10h-2zM12 22a9 9 0 1 1 7.07-14.93l-1.42 1.42A7 7 0 1 0 12 20a7 7 0 0 0 6.35-4h-2.3A5 5 0 1 1 12 7v2a3 3 0 1 0 3 3h2a5 5 0 1 1-5-5V2z"/>
     </svg>
@@ -462,6 +459,12 @@ This keep
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
   // ========= GESTION DES IMAGES DE CONTENU =========
+  const LS = {
+    get(k, def){ try{ const v = localStorage.getItem(k); return v ?? def; }catch{return def;} },
+    set(k, v){ try{ localStorage.setItem(k, v); }catch{} },
+    del(k){ try{ localStorage.removeItem(k);}catch{} }
+  };
+
   // Clés LS: img_dwell, img_plug1, img_plug2, img_tuyarelay1, img_tuyarelay2
   const LS_KEYS = {
     dwell:'img_dwell',
@@ -472,12 +475,15 @@ This keep
   };
 
   function setDwellImage(url){
+    const icon = dwellWrap.querySelector('.icon');
     if (url && url.trim()){
       dwellContentImg.src = url.trim();
       dwellWrap.classList.add('show-image');
+      icon?.setAttribute('aria-hidden','true');  // hide from screen readers
     }else{
       dwellContentImg.removeAttribute('src');
-      dwellWrap.classList.remove('show-image'); // revient au SVG
+      dwellWrap.classList.remove('show-image');
+      icon?.removeAttribute('aria-hidden');
     }
   }
 
