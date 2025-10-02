@@ -243,6 +243,13 @@
   const msInput      = document.getElementById('msInput');
   const hud = document.getElementById('hud');
 
+  // ===== LocalStorage (single definition) =====
+  const LS = {
+    get(k, def){ try{ const v = localStorage.getItem(k); return v ?? def; }catch{return def;} },
+    set(k, v){ try{ localStorage.setItem(k, v); }catch{} },
+    del(k){ try{ localStorage.removeItem(k);}catch{} }
+  };
+
   // --- Image controls
   const targetSelect = document.getElementById('targetSelect');
   const imagePreset  = document.getElementById('imagePreset');
@@ -285,13 +292,6 @@
     if (!menuPanel.contains(e.target) && !settingsIcon.contains(e.target)) toggleMenu(false);
   });
 
-  // ===== LocalStorage =====
-  const LS = {
-    get(k, def){ try{ const v = localStorage.getItem(k); return v ?? def; }catch{return def;} },
-    set(k, v){ try{ localStorage.setItem(k, v); }catch{} },
-    del(k){ try{ localStorage.removeItem(k);}catch{} }
-  };
-
   function log(...a){ console.log(...a); hud.textContent = a.map(String).join(' '); }
 
   // ===== Mode handling =====
@@ -325,7 +325,8 @@
 
   // ===== tuyarelay2 controls (ms + fireMode) =====
   const savedMs = parseInt(LS.get('tuyarelay2_ms', '1500'), 10);
-  msInput.value = isFinite(savedMs) ? savedMs : 1500;
+  const msInputVal = isFinite(savedMs) ? savedMs : 1500;
+  msInput.value = msInputVal;
 
   const fireRadios = () => [...document.querySelectorAll('input[name="fireMode2"]')];
   function getFireMode(){ return (LS.get('tuyarelay2_firemode', 'momentary') || 'momentary'); }
@@ -459,12 +460,6 @@
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
   // ========= GESTION DES IMAGES DE CONTENU =========
-  const LS = {
-    get(k, def){ try{ const v = localStorage.getItem(k); return v ?? def; }catch{return def;} },
-    set(k, v){ try{ localStorage.setItem(k, v); }catch{} },
-    del(k){ try{ localStorage.removeItem(k);}catch{} }
-  };
-
   // Clés LS: img_dwell, img_plug1, img_plug2, img_tuyarelay1, img_tuyarelay2
   const LS_KEYS = {
     dwell:'img_dwell',
