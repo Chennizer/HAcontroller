@@ -14,6 +14,9 @@
     --size: clamp(260px, 50vmin, 520px);
     --dwell: 1500ms;
     --panel-bg:#ffffff; --panel-fg:#000;
+
+    /* NEW: custom gaze pointer size (px) */
+    --gp-size: 36px;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -92,6 +95,48 @@
 
   .hud{ position:fixed; left:12px; bottom:12px; background:rgba(0,0,0,.55); color:#fff; padding:8px 10px; border-radius:10px; font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-width:80vw; white-space:pre-wrap; box-shadow:0 6px 20px rgba(0,0,0,.35); z-index:5; }
   @media (prefers-reduced-motion: reduce){ .fill.filling{ transition-duration: 1ms; } }
+
+  /* =========================
+     CUSTOM GAZE POINTER (from page 2)
+     ========================= */
+  .hide-native-cursor,
+  .hide-native-cursor * {
+    cursor: none !important;
+  }
+  #gazePointerOverlay{
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2147483647; /* above everything */
+    overflow: visible;
+  }
+  #gazePointer{
+    position: absolute;
+    left: 0; top: 0;
+    width: var(--gp-size);
+    height: var(--gp-size);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+  #gazePointer::before{
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: #ff0000; /* red dot */
+  }
+  /* Pulse while dwelling */
+  #gazePointer.gp-dwell::before{
+    animation: gpPulse 700ms ease-in-out infinite alternate;
+  }
+  @keyframes gpPulse{
+    from { transform: scale(1); }
+    to   { transform: scale(1.06); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    #gazePointer.gp-dwell::before{ animation: none; }
+  }
 </style>
 </head>
 <body>
@@ -211,6 +256,11 @@
 </div>
 
 <pre class="hud" id="hud">ready</pre>
+
+<!-- NEW: Custom gaze pointer overlay -->
+<div id="gazePointerOverlay" aria-hidden="true">
+  <div id="gazePointer"></div>
+</div>
 
 <script>
   // Optional: unregister SW so updates show
@@ -403,8 +453,30 @@
     }
   }
 
+  // ======= CUSTOM POINTER INTEGRATION =======
+  const gazePointer = document.getElementById('gazePointer');
+  const pointerState = { started:false, enabled:true, alpha:1 };
+
+  function setPointerPos(x,y){
+    if (!gazePointer) return;
+    gazePointer.style.left = x + 'px';
+    gazePointer.style.top  = y + 'px';
+  }
+  function applyPointerStyles(){
+    if (!gazePointer) return;
+    const visible = pointerState.started && pointerState.enabled;
+    gazePointer.style.opacity = visible ? pointerState.alpha : 0;
+    document.documentElement.classList.toggle('hide-native-cursor', visible);
+    if (!visible){ gazePointer.classList.remove('gp-dwell'); }
+  }
+  function setPointerDwell(active){
+    if (!gazePointer) return;
+    gazePointer.classList.toggle('gp-dwell', !!active);
+  }
+
   function stopDwell(){
     dwelling = false;
+    setPointerDwell(false);           // NEW: stop pulsing
     if (dwellTarget) cancelFill(dwellTarget);
     dwellTimer   = clearTO(dwellTimer);
     outsideTimer = clearTO(outsideTimer);
@@ -415,6 +487,7 @@
   function beginDwell(el, action){
     if (dwelling || firing || inCooldown) return;
     dwelling = true; dwellTarget = el; startFill(el);
+    setPointerDwell(true);            // NEW: start pulsing while dwelling
     dwellTimer = setTimeout(()=>{ stopDwell(); fireUrl(el, action); }, dwellMs);
 
     (function watchInside(){
@@ -455,8 +528,27 @@
   }
   document.querySelectorAll('.dwellable').forEach(bindDwell);
 
-  // Pointer tracking + visibility
-  window.addEventListener('pointermove', (e)=>{ lastPos = {x:e.clientX, y:e.clientY}; }, {passive:true});
+  // Pointer tracking + visibility (extended to drive custom pointer)
+  window.addEventListener('pointermove', (e)=>{
+    lastPos = {x:e.clientX, y:e.clientY};
+    setPointerPos(e.clientX, e.clientY);      // NEW: move custom pointer
+    if (!pointerState.started){               // activate on first move
+      pointerState.started = true;
+      applyPointerStyles();
+    }
+  }, {passive:true});
+  window.addEventListener('pointerleave', ()=>{
+    if (!gazePointer) return;
+    gazePointer.style.opacity = 0;
+    document.documentElement.classList.remove('hide-native-cursor');
+  });
+  window.addEventListener('pointerenter', (e)=>{
+    if (typeof e.clientX === 'number' && typeof e.clientY === 'number'){
+      setPointerPos(e.clientX, e.clientY);
+    }
+    if (pointerState.started) applyPointerStyles();
+  });
+
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopDwell(); });
 
   // ========= GESTION DES IMAGES DE CONTENU =========
@@ -564,6 +656,9 @@
     imageUrl.value = cur || '';
     imagePreset.value = IMAGES.find(i=>i.value===cur)?.value || '';
   });
+
+  // Initialize custom pointer visibility state
+  applyPointerStyles();
 
   log(`ready · base=${BASE}`);
 </script>
